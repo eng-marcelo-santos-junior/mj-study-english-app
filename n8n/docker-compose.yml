@@ -65,6 +65,7 @@ services:
     networks:
       - n8n_network
 
+
 volumes:
   postgres_data:
   n8n_data:

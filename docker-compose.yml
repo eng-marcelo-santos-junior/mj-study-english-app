@@ -1,0 +1,9 @@
+services:
+  python-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: word_extractor_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
