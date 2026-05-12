@@ -2,9 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir fastapi uvicorn[standard]
+RUN pip install --no-cache-dir fastapi uvicorn[standard] anthropic
 
-COPY extract_sentences.py extract_words.py api.py ./
+COPY extract_sentences.py extract_words.py extract_expressions.py api.py ./
 
 EXPOSE 8000
 

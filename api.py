@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 from extract_sentences import extract_sentences
 from extract_words import extract_words
+from extract_expressions import extract_expressions
 
 app = FastAPI(title="Word Extractor API")
 
@@ -30,6 +31,12 @@ def api_extract_sentences(body: TextInput):
 def api_extract_words(body: SentencesInput):
     words = extract_words(body.sentences)
     return {"words": words}
+
+
+@app.post("/extract-expressions")
+def api_extract_expressions(body: SentencesInput):
+    expressions = extract_expressions(body.sentences)
+    return {"expressions": expressions}
 
 
 @app.post("/process")
