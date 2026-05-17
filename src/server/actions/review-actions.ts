@@ -10,8 +10,8 @@ type ActionResult = { error: string } | undefined
 
 export interface ReviewCard {
   id: string
-  front: string
-  back: string
+  frontContent: string
+  backContent: string
   intervalDays: number
   easeFactor: number
   repetitions: number
@@ -54,8 +54,8 @@ export async function getDueCards(deckId: string): Promise<ReviewCard[]> {
     orderBy: { nextReviewAt: 'asc' },
     select: {
       id: true,
-      front: true,
-      back: true,
+      frontContent: true,
+      backContent: true,
       intervalDays: true,
       easeFactor: true,
       repetitions: true,

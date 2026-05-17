@@ -9,8 +9,8 @@ import type { FlashcardInput } from '@/lib/validations'
 
 interface Flashcard {
   id: string
-  front: string
-  back: string
+  frontContent: string
+  backContent: string
   difficulty: string
   intervalDays: number
   nextReviewAt: Date | null
@@ -51,7 +51,7 @@ export function FlashcardCard({ card }: FlashcardCardProps) {
           </Button>
         </div>
         <FlashcardForm
-          defaultValues={{ front: card.front, back: card.back }}
+          defaultValues={{ frontContent: card.frontContent, backContent: card.backContent }}
           action={handleUpdate}
           onSuccess={() => setEditing(false)}
           onCancel={() => setEditing(false)}
@@ -80,9 +80,10 @@ export function FlashcardCard({ card }: FlashcardCardProps) {
           </span>
         </div>
 
-        <p className="min-h-[3rem] text-sm whitespace-pre-wrap text-gray-800 dark:text-gray-100">
-          {flipped ? card.back : card.front}
-        </p>
+        <div
+          className="rich-content min-h-[3rem] text-sm text-gray-800 dark:text-gray-100"
+          dangerouslySetInnerHTML={{ __html: flipped ? card.backContent : card.frontContent }}
+        />
 
         {card.intervalDays > 0 && (
           <p className="mt-3 text-xs text-gray-400">

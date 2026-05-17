@@ -340,9 +340,10 @@ export function ReviewSession({ cards, deckId, deckName }: ReviewSessionProps) {
       >
         {/* Front */}
         <div className="flex flex-1 items-center justify-center p-8">
-          <p className="text-center text-lg leading-relaxed whitespace-pre-wrap text-gray-900 dark:text-gray-50">
-            {card.front}
-          </p>
+          <div
+            className="rich-content text-center text-lg leading-relaxed text-gray-900 dark:text-gray-50"
+            dangerouslySetInnerHTML={{ __html: card.frontContent }}
+          />
         </div>
 
         {/* Divider + Back */}
@@ -354,9 +355,10 @@ export function ReviewSession({ cards, deckId, deckName }: ReviewSessionProps) {
         >
           <div className="border-t border-dashed border-gray-200 dark:border-gray-800" />
           <div className="flex items-center justify-center p-8">
-            <p className="text-center text-base leading-relaxed whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-              {card.back}
-            </p>
+            <div
+              className="rich-content text-center text-base leading-relaxed text-gray-700 dark:text-gray-300"
+              dangerouslySetInnerHTML={{ __html: card.backContent }}
+            />
           </div>
         </div>
       </div>

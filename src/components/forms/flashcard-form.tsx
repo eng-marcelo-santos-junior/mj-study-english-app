@@ -1,12 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { flashcardSchema, type FlashcardInput } from '@/lib/validations'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/editor/RichTextEditor'
 
 interface FlashcardFormProps {
   defaultValues?: FlashcardInput
@@ -31,13 +30,13 @@ export function FlashcardForm({
   const [successMessage, setSuccessMessage] = useState<string>()
 
   const {
-    register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<FlashcardInput>({
     resolver: zodResolver(flashcardSchema),
-    defaultValues: defaultValues ?? { front: '', back: '' },
+    defaultValues: defaultValues ?? { frontContent: '', backContent: '' },
   })
 
   const onSubmit = async (data: FlashcardInput) => {
@@ -60,7 +59,7 @@ export function FlashcardForm({
       setServerError(result.error)
       return
     }
-    reset({ front: '', back: '' })
+    reset({ frontContent: '', backContent: '' })
     setSuccessMessage('Card adicionado!')
     setTimeout(() => setSuccessMessage(undefined), 2000)
   }
@@ -79,27 +78,33 @@ export function FlashcardForm({
         </div>
       )}
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="front">Frente</Label>
-        <Textarea
-          id="front"
-          rows={4}
-          placeholder="Pergunta ou termo..."
-          error={errors.front?.message}
-          {...register('front')}
-        />
-      </div>
+      <Controller
+        name="frontContent"
+        control={control}
+        render={({ field, fieldState }) => (
+          <RichTextEditor
+            value={field.value}
+            onChange={field.onChange}
+            label="Frente"
+            error={fieldState.error?.message}
+            placeholder="Pergunta ou termo..."
+          />
+        )}
+      />
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="back">Verso</Label>
-        <Textarea
-          id="back"
-          rows={4}
-          placeholder="Resposta ou definição..."
-          error={errors.back?.message}
-          {...register('back')}
-        />
-      </div>
+      <Controller
+        name="backContent"
+        control={control}
+        render={({ field, fieldState }) => (
+          <RichTextEditor
+            value={field.value}
+            onChange={field.onChange}
+            label="Verso"
+            error={fieldState.error?.message}
+            placeholder="Resposta ou definição..."
+          />
+        )}
+      />
 
       <div className="flex items-center justify-end gap-3 pt-2">
         {onCancel && (

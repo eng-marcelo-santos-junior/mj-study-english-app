@@ -23,8 +23,8 @@ export const deckSchema = z.object({
 })
 
 export const flashcardSchema = z.object({
-  front: z.string().min(1, 'Frente obrigatória').max(1000, 'Conteúdo muito longo'),
-  back: z.string().min(1, 'Verso obrigatório').max(1000, 'Conteúdo muito longo'),
+  frontContent: z.string().min(1, 'Conteúdo da frente é obrigatório').max(50000),
+  backContent: z.string().min(1, 'Conteúdo do verso é obrigatório').max(50000),
 })
 
 export type RegisterInput = z.infer<typeof registerSchema>

@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { flashcardSchema, type FlashcardInput } from '@/lib/validations'
+import { sanitizeHtml } from '@/lib/sanitize'
 
 type ActionResult = { error: string } | undefined
 
@@ -41,7 +42,11 @@ export async function createFlashcard(deckId: string, data: FlashcardInput): Pro
   if (!parsed.success) return { error: 'Dados inválidos. Verifique os campos.' }
 
   await prisma.flashcard.create({
-    data: { deckId, front: parsed.data.front, back: parsed.data.back },
+    data: {
+      deckId,
+      frontContent: sanitizeHtml(parsed.data.frontContent),
+      backContent: sanitizeHtml(parsed.data.backContent),
+    },
   })
 
   revalidatePath(`/decks/${deckId}`)
@@ -61,7 +66,11 @@ export async function createFlashcardAndContinue(
   if (!parsed.success) return { error: 'Dados inválidos. Verifique os campos.' }
 
   await prisma.flashcard.create({
-    data: { deckId, front: parsed.data.front, back: parsed.data.back },
+    data: {
+      deckId,
+      frontContent: sanitizeHtml(parsed.data.frontContent),
+      backContent: sanitizeHtml(parsed.data.backContent),
+    },
   })
 
   revalidatePath(`/decks/${deckId}`)
@@ -79,7 +88,10 @@ export async function updateFlashcard(cardId: string, data: FlashcardInput): Pro
 
   await prisma.flashcard.update({
     where: { id: cardId },
-    data: { front: parsed.data.front, back: parsed.data.back },
+    data: {
+      frontContent: sanitizeHtml(parsed.data.frontContent),
+      backContent: sanitizeHtml(parsed.data.backContent),
+    },
   })
 
   revalidatePath(`/decks/${card.deck.id}`)
@@ -110,8 +122,8 @@ export async function getDeckFlashcards(deckId: string) {
     orderBy: { createdAt: 'asc' },
     select: {
       id: true,
-      front: true,
-      back: true,
+      frontContent: true,
+      backContent: true,
       difficulty: true,
       intervalDays: true,
       easeFactor: true,
