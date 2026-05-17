@@ -37,6 +37,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const audioUrl = urlData?.signedUrl ?? ''
 
+  const now = new Date()
   const updateData =
     side === 'front'
       ? {
@@ -44,14 +45,26 @@ export async function POST(request: NextRequest, { params }: Params) {
           frontAudioPath: storagePath,
           frontAudioSize: fileSize,
           frontAudioName: fileName,
-          audioUpdatedAt: new Date(),
+          frontAudioSource: 'uploaded',
+          frontAudioProvider: null,
+          frontAudioLanguage: null,
+          frontAudioVoice: null,
+          frontAudioTextHash: null,
+          frontAudioGeneratedAt: null,
+          audioUpdatedAt: now,
         }
       : {
           backAudioUrl: audioUrl,
           backAudioPath: storagePath,
           backAudioSize: fileSize,
           backAudioName: fileName,
-          audioUpdatedAt: new Date(),
+          backAudioSource: 'uploaded',
+          backAudioProvider: null,
+          backAudioLanguage: null,
+          backAudioVoice: null,
+          backAudioTextHash: null,
+          backAudioGeneratedAt: null,
+          audioUpdatedAt: now,
         }
 
   await prisma.flashcard.update({ where: { id: flashcardId }, data: updateData })
@@ -99,6 +112,12 @@ export async function DELETE(request: NextRequest, { params }: Params) {
           frontAudioPath: null,
           frontAudioSize: null,
           frontAudioName: null,
+          frontAudioSource: null,
+          frontAudioProvider: null,
+          frontAudioLanguage: null,
+          frontAudioVoice: null,
+          frontAudioTextHash: null,
+          frontAudioGeneratedAt: null,
           audioUpdatedAt: new Date(),
         }
       : {
@@ -106,6 +125,12 @@ export async function DELETE(request: NextRequest, { params }: Params) {
           backAudioPath: null,
           backAudioSize: null,
           backAudioName: null,
+          backAudioSource: null,
+          backAudioProvider: null,
+          backAudioLanguage: null,
+          backAudioVoice: null,
+          backAudioTextHash: null,
+          backAudioGeneratedAt: null,
           audioUpdatedAt: new Date(),
         }
 

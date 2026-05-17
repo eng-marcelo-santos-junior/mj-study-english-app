@@ -8,6 +8,7 @@ import { flashcardSchema, type FlashcardInput } from '@/lib/validations'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor } from '@/components/editor/RichTextEditor'
 import { AudioUploadField, uploadAudioFile } from '@/components/audio/AudioUploadField'
+import { TTSOptionsPanel, TTS_STATE_DEFAULT, type TtsState } from '@/components/tts/TTSOptionsPanel'
 
 type ActionResult = { error: string } | { id: string } | undefined
 
@@ -19,14 +20,30 @@ interface FlashcardFormProps {
   submitLabel?: string
   showAddAnother?: boolean
   onAddAnother?: (data: FlashcardInput) => Promise<ActionResult>
-  // Existing card (edit mode)
+  // Edit mode
   flashcardId?: string
   frontAudioUrl?: string | null
   frontAudioName?: string | null
+  frontAudioSource?: string | null
   backAudioUrl?: string | null
   backAudioName?: string | null
-  // New card (creation mode): redirect here after creation + audio upload
+  backAudioSource?: string | null
+  // Creation mode: redirect after creation + audio upload
   redirectAfterCreate?: string
+}
+
+async function callTtsGenerate(
+  flashcardId: string,
+  side: 'front' | 'back',
+  tts: TtsState
+): Promise<void> {
+  if (!tts.enabled || !tts.voice) return
+  await fetch(`/api/tts/${flashcardId}/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ side, voice: tts.voice, language: tts.language }),
+  })
+  // Errors here are non-fatal — card already saved
 }
 
 export function FlashcardForm({
@@ -40,8 +57,10 @@ export function FlashcardForm({
   flashcardId,
   frontAudioUrl,
   frontAudioName,
+  frontAudioSource,
   backAudioUrl,
   backAudioName,
+  backAudioSource,
   redirectAfterCreate,
 }: FlashcardFormProps) {
   const router = useRouter()
@@ -50,37 +69,79 @@ export function FlashcardForm({
   const [successMessage, setSuccessMessage] = useState<string>()
   const [uploadingAudio, setUploadingAudio] = useState(false)
 
-  // Existing card audio state
+  // Existing card audio state (edit mode)
   const [currentFrontAudioUrl, setCurrentFrontAudioUrl] = useState(frontAudioUrl)
   const [currentFrontAudioName, setCurrentFrontAudioName] = useState(frontAudioName)
   const [currentBackAudioUrl, setCurrentBackAudioUrl] = useState(backAudioUrl)
   const [currentBackAudioName, setCurrentBackAudioName] = useState(backAudioName)
 
-  // Pending audio files (new card creation)
+  // Pending audio files (creation mode, manual upload)
   const [pendingFrontAudio, setPendingFrontAudio] = useState<File | null>(null)
   const [pendingBackAudio, setPendingBackAudio] = useState<File | null>(null)
+
+  // TTS state per side
+  const [frontTts, setFrontTts] = useState<TtsState>(TTS_STATE_DEFAULT)
+  const [backTts, setBackTts] = useState<TtsState>(TTS_STATE_DEFAULT)
 
   const {
     control,
     handleSubmit,
     reset,
+    watch,
     formState: { isSubmitting },
   } = useForm<FlashcardInput>({
     resolver: zodResolver(flashcardSchema),
     defaultValues: defaultValues ?? { frontContent: '', backContent: '' },
   })
 
+  const frontContent = watch('frontContent')
+  const backContent = watch('backContent')
+
   const isCreationMode = !flashcardId
-  const busy = isSubmitting || uploadingAudio
+  const hasExistingFrontAudio = !!currentFrontAudioUrl
+  const hasExistingBackAudio = !!currentBackAudioUrl
+  const busy = isSubmitting || uploadingAudio || frontTts.generating || backTts.generating
+
+  // TTS is disabled when a manual audio already exists for that side
+  const frontTtsDisabled = isCreationMode ? !!pendingFrontAudio : hasExistingFrontAudio
+  const backTtsDisabled = isCreationMode ? !!pendingBackAudio : hasExistingBackAudio
+
+  function validateTts(tts: TtsState, sideLabel: string): string | null {
+    if (!tts.enabled) return null
+    if (!tts.voice) return `Selecione uma voz para o áudio da ${sideLabel}.`
+    if (tts.previewUrl === null) return `Gere o preview de áudio da ${sideLabel} antes de salvar.`
+    return null
+  }
 
   async function uploadPendingAudio(cardId: string) {
     const uploads: Promise<void>[] = []
-    if (pendingFrontAudio) uploads.push(uploadAudioFile(pendingFrontAudio, cardId, 'front'))
-    if (pendingBackAudio) uploads.push(uploadAudioFile(pendingBackAudio, cardId, 'back'))
+    if (pendingFrontAudio && !frontTts.enabled)
+      uploads.push(uploadAudioFile(pendingFrontAudio, cardId, 'front'))
+    if (pendingBackAudio && !backTts.enabled)
+      uploads.push(uploadAudioFile(pendingBackAudio, cardId, 'back'))
     if (uploads.length > 0) await Promise.all(uploads)
   }
 
+  async function generateTtsAudio(cardId: string) {
+    const jobs: Promise<void>[] = []
+    if (frontTts.enabled && frontTts.voice) jobs.push(callTtsGenerate(cardId, 'front', frontTts))
+    if (backTts.enabled && backTts.voice) jobs.push(callTtsGenerate(cardId, 'back', backTts))
+    if (jobs.length > 0) await Promise.all(jobs)
+  }
+
   const onSubmit = async (data: FlashcardInput) => {
+    // Validate TTS state before submitting
+    const frontTtsError = validateTts(frontTts, 'frente')
+    if (frontTtsError) {
+      setServerError(frontTtsError)
+      return
+    }
+    const backTtsError = validateTts(backTts, 'verso')
+    if (backTtsError) {
+      setServerError(backTtsError)
+      return
+    }
+
     setServerError(undefined)
     setSuccessMessage(undefined)
 
@@ -91,17 +152,16 @@ export function FlashcardForm({
       return
     }
 
-    // New card created — upload pending audio then redirect
+    // New card created
     if (result && 'id' in result) {
-      if (pendingFrontAudio || pendingBackAudio) {
-        setUploadingAudio(true)
-        try {
-          await uploadPendingAudio(result.id)
-        } catch {
-          // Audio upload failed — card still saved, don't block
-        } finally {
-          setUploadingAudio(false)
-        }
+      setUploadingAudio(true)
+      try {
+        await uploadPendingAudio(result.id)
+        await generateTtsAudio(result.id)
+      } catch {
+        // Non-fatal: card is saved
+      } finally {
+        setUploadingAudio(false)
       }
       if (redirectAfterCreate) {
         router.push(redirectAfterCreate)
@@ -111,12 +171,35 @@ export function FlashcardForm({
       return
     }
 
-    // Edit mode: no return value
+    // Edit mode: generate TTS if enabled
+    if (flashcardId) {
+      setUploadingAudio(true)
+      try {
+        await generateTtsAudio(flashcardId)
+      } catch {
+        // Non-fatal
+      } finally {
+        setUploadingAudio(false)
+      }
+    }
+
     onSuccess?.()
   }
 
   const onSubmitAndContinue = async (data: FlashcardInput) => {
     if (!onAddAnother) return
+
+    const frontTtsError = validateTts(frontTts, 'frente')
+    if (frontTtsError) {
+      setServerError(frontTtsError)
+      return
+    }
+    const backTtsError = validateTts(backTts, 'verso')
+    if (backTtsError) {
+      setServerError(backTtsError)
+      return
+    }
+
     setServerError(undefined)
     setSuccessMessage(undefined)
 
@@ -127,26 +210,32 @@ export function FlashcardForm({
       return
     }
 
-    // New card created — upload pending audio then reset
     if (result && 'id' in result) {
-      if (pendingFrontAudio || pendingBackAudio) {
-        setUploadingAudio(true)
-        try {
-          await uploadPendingAudio(result.id)
-        } catch {
-          // ignore
-        } finally {
-          setUploadingAudio(false)
-        }
+      setUploadingAudio(true)
+      try {
+        await uploadPendingAudio(result.id)
+        await generateTtsAudio(result.id)
+      } catch {
+        // Non-fatal
+      } finally {
+        setUploadingAudio(false)
       }
     }
 
     reset({ frontContent: '', backContent: '' })
     setPendingFrontAudio(null)
     setPendingBackAudio(null)
+    setFrontTts(TTS_STATE_DEFAULT)
+    setBackTts(TTS_STATE_DEFAULT)
     setSuccessMessage('Card adicionado!')
     setTimeout(() => setSuccessMessage(undefined), 2000)
   }
+
+  const submitLabel_ = uploadingAudio
+    ? frontTts.enabled || backTts.enabled
+      ? 'Gerando áudio...'
+      : 'Enviando áudio...'
+    : submitLabel
 
   return (
     <form className="flex flex-col gap-5">
@@ -162,6 +251,7 @@ export function FlashcardForm({
         </div>
       )}
 
+      {/* ── Front ── */}
       <Controller
         name="frontContent"
         control={control}
@@ -177,7 +267,14 @@ export function FlashcardForm({
       />
 
       {isCreationMode ? (
-        <AudioUploadField side="front" onFileSelected={setPendingFrontAudio} disabled={busy} />
+        <AudioUploadField
+          side="front"
+          onFileSelected={(file) => {
+            setPendingFrontAudio(file)
+            if (file) setFrontTts(TTS_STATE_DEFAULT)
+          }}
+          disabled={busy || frontTts.enabled}
+        />
       ) : (
         <AudioUploadField
           side="front"
@@ -192,6 +289,24 @@ export function FlashcardForm({
         />
       )}
 
+      <TTSOptionsPanel
+        side="front"
+        content={frontContent}
+        state={frontTts}
+        onChange={setFrontTts}
+        disabled={frontTtsDisabled}
+        disabledReason={
+          frontTtsDisabled
+            ? isCreationMode
+              ? 'Remova o arquivo selecionado para gerar áudio automaticamente.'
+              : frontAudioSource === 'generated'
+                ? 'Exclua o áudio atual para gerar um novo.'
+                : 'Exclua o áudio atual para usar geração automática.'
+            : undefined
+        }
+      />
+
+      {/* ── Back ── */}
       <Controller
         name="backContent"
         control={control}
@@ -207,7 +322,14 @@ export function FlashcardForm({
       />
 
       {isCreationMode ? (
-        <AudioUploadField side="back" onFileSelected={setPendingBackAudio} disabled={busy} />
+        <AudioUploadField
+          side="back"
+          onFileSelected={(file) => {
+            setPendingBackAudio(file)
+            if (file) setBackTts(TTS_STATE_DEFAULT)
+          }}
+          disabled={busy || backTts.enabled}
+        />
       ) : (
         <AudioUploadField
           side="back"
@@ -221,6 +343,23 @@ export function FlashcardForm({
           }}
         />
       )}
+
+      <TTSOptionsPanel
+        side="back"
+        content={backContent}
+        state={backTts}
+        onChange={setBackTts}
+        disabled={backTtsDisabled}
+        disabledReason={
+          backTtsDisabled
+            ? isCreationMode
+              ? 'Remova o arquivo selecionado para gerar áudio automaticamente.'
+              : backAudioSource === 'generated'
+                ? 'Exclua o áudio atual para gerar um novo.'
+                : 'Exclua o áudio atual para usar geração automática.'
+            : undefined
+        }
+      />
 
       <div className="flex items-center justify-end gap-3 pt-2">
         {onCancel && (
@@ -241,7 +380,7 @@ export function FlashcardForm({
         )}
 
         <Button type="button" loading={busy} onClick={handleSubmit(onSubmit)}>
-          {uploadingAudio ? 'Enviando áudio...' : submitLabel}
+          {submitLabel_}
         </Button>
       </div>
     </form>

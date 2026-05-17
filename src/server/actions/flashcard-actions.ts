@@ -165,8 +165,10 @@ export async function getDeckFlashcards(deckId: string) {
       createdAt: true,
       frontAudioPath: true,
       frontAudioName: true,
+      frontAudioSource: true,
       backAudioPath: true,
       backAudioName: true,
+      backAudioSource: true,
     },
   })
 }

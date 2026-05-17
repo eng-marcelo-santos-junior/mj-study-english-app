@@ -16,8 +16,10 @@ interface Flashcard {
   nextReviewAt: Date | null
   frontAudioPath: string | null
   frontAudioName: string | null
+  frontAudioSource: string | null
   backAudioPath: string | null
   backAudioName: string | null
+  backAudioSource: string | null
 }
 
 interface FlashcardCardProps {
@@ -62,7 +64,9 @@ export function FlashcardCard({ card }: FlashcardCardProps) {
           submitLabel="Salvar alterações"
           flashcardId={card.id}
           frontAudioName={card.frontAudioName}
+          frontAudioSource={card.frontAudioSource}
           backAudioName={card.backAudioName}
+          backAudioSource={card.backAudioSource}
         />
       </div>
     )
