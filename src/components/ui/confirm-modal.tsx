@@ -31,7 +31,6 @@ export function ConfirmModal({
       setLoading(false)
       return
     }
-    // se não houver erro o Server Action redirecionou, componente desmonta
   }
 
   return (
@@ -39,22 +38,29 @@ export function ConfirmModal({
       <span onClick={() => setOpen(true)}>{trigger}</span>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-title"
+        >
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => !loading && setOpen(false)}
+            aria-hidden
           />
 
           {/* Modal */}
-          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
+          <div className="animate-slide-in-up relative z-10 w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+            <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/50">
               <svg
-                className="h-5 w-5 text-red-600"
+                className="h-5 w-5 text-red-600 dark:text-red-400"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth={2}
                 viewBox="0 0 24 24"
+                aria-hidden
               >
                 <path
                   strokeLinecap="round"
@@ -64,11 +70,21 @@ export function ConfirmModal({
               </svg>
             </div>
 
-            <h3 className="mt-2 text-base font-semibold text-gray-900">{title}</h3>
-            <p className="mt-1 text-sm text-gray-500">{description}</p>
+            <h3
+              id="modal-title"
+              className="mt-2 text-base font-semibold text-gray-900 dark:text-gray-50"
+            >
+              {title}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</p>
 
             {error && (
-              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+              <p
+                className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-400"
+                role="alert"
+              >
+                {error}
+              </p>
             )}
 
             <div className="mt-6 flex justify-end gap-3">

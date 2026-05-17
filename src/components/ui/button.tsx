@@ -12,12 +12,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const base =
-      'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50'
+      'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 disabled:pointer-events-none disabled:opacity-50'
 
     const variants = {
-      primary: 'bg-indigo-600 text-white hover:bg-indigo-700',
-      ghost: 'bg-transparent text-gray-700 hover:bg-gray-100',
-      danger: 'bg-red-600 text-white hover:bg-red-700',
+      primary: 'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800',
+      ghost:
+        'bg-transparent text-gray-700 hover:bg-gray-100 active:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-800 dark:active:bg-gray-700',
+      danger: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',
     }
 
     const sizes = {
@@ -33,7 +34,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {loading && (
-          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden>
             <circle
               className="opacity-25"
               cx="12"

@@ -18,7 +18,9 @@ export default function NewDeckPage() {
       </nav>
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h1 className="mb-1 text-lg font-semibold text-gray-900">Criar novo deck</h1>
+        <h1 className="mb-1 text-lg font-semibold text-gray-900 dark:text-gray-50">
+          Criar novo deck
+        </h1>
         <p className="mb-6 text-sm text-gray-500">
           Um deck é uma coleção de flashcards sobre um mesmo tema.
         </p>

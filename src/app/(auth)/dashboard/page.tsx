@@ -60,7 +60,9 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Olá, {firstName} 👋</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">
+            Olá, {firstName} 👋
+          </h1>
           <p className="mt-1 text-sm text-gray-500">Aqui está o resumo dos seus estudos</p>
         </div>
         <Link href="/decks/new">
@@ -95,7 +97,9 @@ export default async function DashboardPage() {
       {/* Recent Decks */}
       <div>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">Decks recentes</h2>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">
+            Decks recentes
+          </h2>
           {deckCount > 3 && (
             <Link
               href="/decks"

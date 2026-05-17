@@ -14,7 +14,7 @@ export default async function DecksPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Meus Decks</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Meus Decks</h1>
           <p className="mt-1 text-sm text-gray-500">
             {decks.length === 0
               ? 'Nenhum deck criado ainda'

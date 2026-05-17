@@ -50,7 +50,7 @@ export default async function DeckDetailPage({ params }: Props) {
             {deck.name.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">{deck.name}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">{deck.name}</h1>
             {deck.description && <p className="mt-1 text-sm text-gray-500">{deck.description}</p>}
           </div>
         </div>

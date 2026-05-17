@@ -29,7 +29,7 @@ export default async function ReviewPage({ params }: Props) {
           ✅
         </div>
         <div className="text-center">
-          <h1 className="text-2xl font-semibold text-gray-900">Tudo em dia!</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Tudo em dia!</h1>
           <p className="mt-2 text-sm text-gray-500">
             Nenhum card de <span className="font-medium text-gray-700">{deck.name}</span> precisa de
             revisão agora.

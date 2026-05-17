@@ -65,7 +65,10 @@ export function LoginForm() {
 
       <p className="text-center text-sm text-gray-500">
         Não tem conta?{' '}
-        <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-700">
+        <Link
+          href="/register"
+          className="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+        >
           Criar conta
         </Link>
       </p>

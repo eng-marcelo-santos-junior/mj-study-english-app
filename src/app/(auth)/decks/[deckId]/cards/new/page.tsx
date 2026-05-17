@@ -41,7 +41,7 @@ export default async function NewFlashcardPage({ params }: Props) {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Novo flashcard</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Novo flashcard</h1>
         <p className="mt-1 text-sm text-gray-500">
           Adicionando ao deck <span className="font-medium text-gray-700">{deck.name}</span>
         </p>

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { logoutAction } from '@/server/actions/auth-actions'
 import { NavLink } from '@/components/ui/nav-link'
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 const navItems = [
   {
@@ -15,6 +16,7 @@ const navItems = [
         stroke="currentColor"
         strokeWidth={2}
         viewBox="0 0 24 24"
+        aria-hidden
       >
         <path
           strokeLinecap="round"
@@ -34,6 +36,7 @@ const navItems = [
         stroke="currentColor"
         strokeWidth={2}
         viewBox="0 0 24 24"
+        aria-hidden
       >
         <path
           strokeLinecap="round"
@@ -53,6 +56,7 @@ const navItems = [
         stroke="currentColor"
         strokeWidth={2}
         viewBox="0 0 24 24"
+        aria-hidden
       >
         <path
           strokeLinecap="round"
@@ -70,19 +74,23 @@ export async function Sidebar() {
   const userInitial = userName.charAt(0).toUpperCase()
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r border-gray-200 bg-white">
+    <aside className="flex h-full w-60 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
       {/* Logo */}
-      <div className="flex h-16 items-center border-b border-gray-200 px-6">
+      <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800">
         <Link href="/dashboard" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
             S
           </div>
-          <span className="text-sm font-semibold text-gray-900">StudyApp</span>
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-50">StudyApp</span>
         </Link>
+        <ThemeToggle />
       </div>
 
       {/* Navigation */}
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
+      <nav
+        className="flex flex-1 flex-col gap-1 overflow-y-auto p-4"
+        aria-label="Navegação principal"
+      >
         {navItems.map((item) => (
           <NavLink key={item.href} href={item.href} icon={item.icon}>
             {item.label}
@@ -91,14 +99,21 @@ export async function Sidebar() {
       </nav>
 
       {/* User + Logout */}
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t border-gray-200 p-4 dark:border-gray-800">
         <div className="mb-3 flex items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+          <div
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+            aria-hidden
+          >
             {userInitial}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-gray-900">{userName}</p>
-            <p className="truncate text-xs text-gray-500">{session?.user?.email}</p>
+            <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-50">
+              {userName}
+            </p>
+            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+              {session?.user?.email}
+            </p>
           </div>
         </div>
         <form action={logoutAction}>
@@ -106,7 +121,7 @@ export async function Sidebar() {
             variant="ghost"
             size="sm"
             type="submit"
-            className="w-full justify-start gap-2 text-gray-600"
+            className="w-full justify-start gap-2 text-gray-600 dark:text-gray-400"
           >
             <svg
               className="h-4 w-4"
@@ -114,6 +129,7 @@ export async function Sidebar() {
               stroke="currentColor"
               strokeWidth={2}
               viewBox="0 0 24 24"
+              aria-hidden
             >
               <path
                 strokeLinecap="round"

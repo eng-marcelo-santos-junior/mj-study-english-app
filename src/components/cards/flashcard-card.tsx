@@ -43,9 +43,9 @@ export function FlashcardCard({ card }: FlashcardCardProps) {
 
   if (editing) {
     return (
-      <div className="rounded-xl border border-indigo-200 bg-white p-5 shadow-sm">
+      <div className="rounded-xl border border-indigo-200 bg-white p-5 shadow-sm dark:border-indigo-800 dark:bg-gray-900">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-gray-700">Editar flashcard</h3>
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">Editar flashcard</h3>
           <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
             ✕
           </Button>
@@ -62,7 +62,7 @@ export function FlashcardCard({ card }: FlashcardCardProps) {
   }
 
   return (
-    <div className="group rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+    <div className="group rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
       {/* Card face */}
       <div
         className="cursor-pointer p-5"
@@ -80,7 +80,7 @@ export function FlashcardCard({ card }: FlashcardCardProps) {
           </span>
         </div>
 
-        <p className="min-h-[3rem] text-sm whitespace-pre-wrap text-gray-800">
+        <p className="min-h-[3rem] text-sm whitespace-pre-wrap text-gray-800 dark:text-gray-100">
           {flipped ? card.back : card.front}
         </p>
 
@@ -92,7 +92,7 @@ export function FlashcardCard({ card }: FlashcardCardProps) {
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2 opacity-0 transition-opacity group-hover:opacity-100 dark:border-gray-800">
         <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
           Editar
         </Button>
@@ -105,7 +105,7 @@ export function FlashcardCard({ card }: FlashcardCardProps) {
             <Button
               variant="ghost"
               size="sm"
-              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+              className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40"
             >
               Excluir
             </Button>

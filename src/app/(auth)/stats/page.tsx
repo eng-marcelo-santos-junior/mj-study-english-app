@@ -190,7 +190,7 @@ export default async function StatsPage() {
     <div className="flex flex-col gap-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Estatísticas</h1>
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Estatísticas</h1>
         <p className="mt-1 text-sm text-gray-500">Acompanhe sua evolução de aprendizado</p>
       </div>
 
@@ -203,7 +203,9 @@ export default async function StatsPage() {
 
       {/* Activity chart */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-sm font-semibold text-gray-900">Atividade — últimos 30 dias</h2>
+        <h2 className="mb-4 text-sm font-semibold text-gray-900 dark:text-gray-50">
+          Atividade — últimos 30 dias
+        </h2>
         <ActivityChart data={data.daily} />
       </div>
 
@@ -211,7 +213,7 @@ export default async function StatsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Rating distribution */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold text-gray-900">
+          <h2 className="mb-4 text-sm font-semibold text-gray-900 dark:text-gray-50">
             Distribuição de avaliações
             <span className="ml-1 font-normal text-gray-400">(30 dias)</span>
           </h2>
@@ -220,14 +222,18 @@ export default async function StatsPage() {
 
         {/* Weekly comparison */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold text-gray-900">Esta semana vs anterior</h2>
+          <h2 className="mb-4 text-sm font-semibold text-gray-900 dark:text-gray-50">
+            Esta semana vs anterior
+          </h2>
           <WeeklyComparison comparison={data.weeklyComparison} />
         </div>
       </div>
 
       {/* Weekly trend */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-sm font-semibold text-gray-900">Tendência semanal</h2>
+        <h2 className="mb-4 text-sm font-semibold text-gray-900 dark:text-gray-50">
+          Tendência semanal
+        </h2>
         <p className="mb-4 text-xs text-gray-400">Revisões · Acerto%</p>
         <WeeklyTrend weekly={data.weekly} />
       </div>
@@ -235,7 +241,7 @@ export default async function StatsPage() {
       {/* Daily breakdown table — last 7 days */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-6 py-4">
-          <h2 className="text-sm font-semibold text-gray-900">Últimos 7 dias</h2>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-50">Últimos 7 dias</h2>
         </div>
         <div className="divide-y divide-gray-100">
           {data.daily

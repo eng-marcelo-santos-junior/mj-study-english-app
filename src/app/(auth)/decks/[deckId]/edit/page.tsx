@@ -38,7 +38,7 @@ export default async function EditDeckPage({ params }: Props) {
       </nav>
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h1 className="mb-1 text-lg font-semibold text-gray-900">Editar deck</h1>
+        <h1 className="mb-1 text-lg font-semibold text-gray-900 dark:text-gray-50">Editar deck</h1>
         <p className="mb-6 text-sm text-gray-500">Atualize o nome ou a descrição do deck.</p>
         <DeckForm
           action={action}
