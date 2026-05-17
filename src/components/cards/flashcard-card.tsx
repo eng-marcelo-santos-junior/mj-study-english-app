@@ -14,6 +14,10 @@ interface Flashcard {
   difficulty: string
   intervalDays: number
   nextReviewAt: Date | null
+  frontAudioPath: string | null
+  frontAudioName: string | null
+  backAudioPath: string | null
+  backAudioName: string | null
 }
 
 interface FlashcardCardProps {
@@ -56,6 +60,9 @@ export function FlashcardCard({ card }: FlashcardCardProps) {
           onSuccess={() => setEditing(false)}
           onCancel={() => setEditing(false)}
           submitLabel="Salvar alterações"
+          flashcardId={card.id}
+          frontAudioName={card.frontAudioName}
+          backAudioName={card.backAudioName}
         />
       </div>
     )
@@ -75,9 +82,14 @@ export function FlashcardCard({ card }: FlashcardCardProps) {
           >
             {badge.label}
           </span>
-          <span className="text-xs text-gray-400">
-            {flipped ? 'Verso' : 'Frente'} · clique para virar
-          </span>
+          <div className="flex items-center gap-2">
+            {(card.frontAudioPath || card.backAudioPath) && (
+              <span className="text-xs text-indigo-400">🎵</span>
+            )}
+            <span className="text-xs text-gray-400">
+              {flipped ? 'Verso' : 'Frente'} · clique para virar
+            </span>
+          </div>
         </div>
 
         <div

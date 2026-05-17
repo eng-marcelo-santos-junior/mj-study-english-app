@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { flashcardSchema, type FlashcardInput } from '@/lib/validations'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor } from '@/components/editor/RichTextEditor'
+import { AudioUploadField } from '@/components/audio/AudioUploadField'
 
 interface FlashcardFormProps {
   defaultValues?: FlashcardInput
@@ -15,6 +16,12 @@ interface FlashcardFormProps {
   submitLabel?: string
   showAddAnother?: boolean
   onAddAnother?: (data: FlashcardInput) => Promise<{ error: string } | undefined>
+  // Audio props (only available in edit mode)
+  flashcardId?: string
+  frontAudioUrl?: string | null
+  frontAudioName?: string | null
+  backAudioUrl?: string | null
+  backAudioName?: string | null
 }
 
 export function FlashcardForm({
@@ -25,9 +32,18 @@ export function FlashcardForm({
   submitLabel = 'Salvar',
   showAddAnother = false,
   onAddAnother,
+  flashcardId,
+  frontAudioUrl,
+  frontAudioName,
+  backAudioUrl,
+  backAudioName,
 }: FlashcardFormProps) {
   const [serverError, setServerError] = useState<string>()
   const [successMessage, setSuccessMessage] = useState<string>()
+  const [currentFrontAudioUrl, setCurrentFrontAudioUrl] = useState(frontAudioUrl)
+  const [currentFrontAudioName, setCurrentFrontAudioName] = useState(frontAudioName)
+  const [currentBackAudioUrl, setCurrentBackAudioUrl] = useState(backAudioUrl)
+  const [currentBackAudioName, setCurrentBackAudioName] = useState(backAudioName)
 
   const {
     control,
@@ -92,6 +108,25 @@ export function FlashcardForm({
         )}
       />
 
+      {flashcardId ? (
+        <AudioUploadField
+          side="front"
+          flashcardId={flashcardId}
+          existingAudioUrl={currentFrontAudioUrl}
+          existingAudioName={currentFrontAudioName}
+          onUploadComplete={(_, name) => {
+            setCurrentFrontAudioName(name)
+            // URL refreshed on next page load via signed URL
+          }}
+          onDeleteComplete={() => {
+            setCurrentFrontAudioUrl(null)
+            setCurrentFrontAudioName(null)
+          }}
+        />
+      ) : (
+        <p className="text-xs text-gray-400">Salve o card para adicionar áudio à frente.</p>
+      )}
+
       <Controller
         name="backContent"
         control={control}
@@ -105,6 +140,24 @@ export function FlashcardForm({
           />
         )}
       />
+
+      {flashcardId ? (
+        <AudioUploadField
+          side="back"
+          flashcardId={flashcardId}
+          existingAudioUrl={currentBackAudioUrl}
+          existingAudioName={currentBackAudioName}
+          onUploadComplete={(_, name) => {
+            setCurrentBackAudioName(name)
+          }}
+          onDeleteComplete={() => {
+            setCurrentBackAudioUrl(null)
+            setCurrentBackAudioName(null)
+          }}
+        />
+      ) : (
+        <p className="text-xs text-gray-400">Salve o card para adicionar áudio ao verso.</p>
+      )}
 
       <div className="flex items-center justify-end gap-3 pt-2">
         {onCancel && (

@@ -5,6 +5,16 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { calculateNextReview, type Rating } from '@/lib/spaced-repetition'
+import { getSignedDownloadUrl } from '@/lib/audio/audio-storage'
+
+async function resolveAudioUrl(path: string | null): Promise<string | null> {
+  if (!path) return null
+  try {
+    return await getSignedDownloadUrl(path)
+  } catch {
+    return null
+  }
+}
 
 type ActionResult = { error: string } | undefined
 
@@ -16,6 +26,10 @@ export interface ReviewCard {
   easeFactor: number
   repetitions: number
   difficulty: string
+  frontAudioUrl: string | null
+  frontAudioPath: string | null
+  backAudioUrl: string | null
+  backAudioPath: string | null
 }
 
 async function requireAuth(): Promise<string> {
@@ -49,7 +63,7 @@ export async function getDueCards(deckId: string): Promise<ReviewCard[]> {
   const deck = await verifyDeckOwnership(deckId, userId)
   if (!deck) return []
 
-  return prisma.flashcard.findMany({
+  const rows = await prisma.flashcard.findMany({
     where: { deckId, nextReviewAt: { lte: new Date() } },
     orderBy: { nextReviewAt: 'asc' },
     select: {
@@ -60,8 +74,18 @@ export async function getDueCards(deckId: string): Promise<ReviewCard[]> {
       easeFactor: true,
       repetitions: true,
       difficulty: true,
+      frontAudioPath: true,
+      backAudioPath: true,
     },
   })
+
+  return Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      frontAudioUrl: await resolveAudioUrl(row.frontAudioPath),
+      backAudioUrl: await resolveAudioUrl(row.backAudioPath),
+    }))
+  )
 }
 
 export async function getReviewedTodayCount(deckId: string): Promise<number> {

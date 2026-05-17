@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { submitRating } from '@/server/actions/review-actions'
 import { calculateNextReview, type Rating } from '@/lib/spaced-repetition'
 import { Button } from '@/components/ui/button'
+import { AudioPlayer } from '@/components/audio/AudioPlayer'
 import type { ReviewCard } from '@/server/actions/review-actions'
 
 interface ReviewSessionProps {
@@ -245,6 +246,8 @@ export function ReviewSession({ cards, deckId, deckName }: ReviewSessionProps) {
   const [stats, setStats] = useState<SessionStats>({ again: 0, hard: 0, good: 0, easy: 0 })
   const [done, setDone] = useState(false)
   const [busy, setBusy] = useState(false)
+  // Track audio key to force AudioPlayer remount on card change
+  const [audioKey, setAudioKey] = useState(0)
 
   const card = cards[index]
   const hints = card ? getIntervalHints(card) : ({} as Record<Rating, string>)
@@ -268,6 +271,7 @@ export function ReviewSession({ cards, deckId, deckName }: ReviewSessionProps) {
         setRevealed(false)
         setExiting(false)
         setBusy(false)
+        setAudioKey((k) => k + 1)
       }
     },
     [busy, card, index, cards.length]
@@ -276,11 +280,10 @@ export function ReviewSession({ cards, deckId, deckName }: ReviewSessionProps) {
   // ── Keyboard shortcuts ─────────────────────────────────────
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      // Ignore when typing in an input/textarea
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      // Ignore modifier combos
       if (e.ctrlKey || e.metaKey || e.altKey) return
 
+      // Space/Enter: reveal answer (AudioPlayer handles its own Space internally)
       if ((e.key === ' ' || e.key === 'Enter') && !revealed && !done) {
         e.preventDefault()
         setRevealed(true)
@@ -339,26 +342,44 @@ export function ReviewSession({ cards, deckId, deckName }: ReviewSessionProps) {
         aria-label={revealed ? 'Card com frente e verso revelado' : 'Card — frente'}
       >
         {/* Front */}
-        <div className="flex flex-1 items-center justify-center p-8">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
           <div
             className="rich-content text-center text-lg leading-relaxed text-gray-900 dark:text-gray-50"
             dangerouslySetInnerHTML={{ __html: card.frontContent }}
           />
+          {card.frontAudioUrl && (
+            <AudioPlayer
+              key={`front-${audioKey}`}
+              src={card.frontAudioUrl}
+              autoPlay
+              label="Áudio — frente"
+              className="w-full max-w-sm"
+            />
+          )}
         </div>
 
         {/* Divider + Back */}
         <div
           className={`overflow-hidden transition-all duration-300 ${
-            revealed ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+            revealed ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
           }`}
           aria-hidden={!revealed}
         >
           <div className="border-t border-dashed border-gray-200 dark:border-gray-800" />
-          <div className="flex items-center justify-center p-8">
+          <div className="flex flex-col items-center justify-center gap-4 p-8">
             <div
               className="rich-content text-center text-base leading-relaxed text-gray-700 dark:text-gray-300"
               dangerouslySetInnerHTML={{ __html: card.backContent }}
             />
+            {card.backAudioUrl && revealed && (
+              <AudioPlayer
+                key={`back-${audioKey}`}
+                src={card.backAudioUrl}
+                autoPlay
+                label="Áudio — verso"
+                className="w-full max-w-sm"
+              />
+            )}
           </div>
         </div>
       </div>

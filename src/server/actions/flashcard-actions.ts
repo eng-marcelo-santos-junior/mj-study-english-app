@@ -6,6 +6,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { flashcardSchema, type FlashcardInput } from '@/lib/validations'
 import { sanitizeHtml } from '@/lib/sanitize'
+import { deleteAudioFromStorage } from '@/lib/audio/audio-storage'
 
 type ActionResult = { error: string } | undefined
 
@@ -100,8 +101,15 @@ export async function updateFlashcard(cardId: string, data: FlashcardInput): Pro
 export async function deleteFlashcard(cardId: string): Promise<ActionResult> {
   const userId = await requireAuth()
 
-  const card = await verifyCardOwnership(cardId, userId)
-  if (!card) return { error: 'Flashcard não encontrado.' }
+  const card = await prisma.flashcard.findUnique({
+    where: { id: cardId },
+    include: { deck: { select: { userId: true, id: true } } },
+  })
+  if (!card || card.deck.userId !== userId) return { error: 'Flashcard não encontrado.' }
+
+  // Clean up audio files from storage
+  const paths = [card.frontAudioPath, card.backAudioPath].filter(Boolean) as string[]
+  await Promise.allSettled(paths.map((p) => deleteAudioFromStorage(p)))
 
   await prisma.flashcard.delete({ where: { id: cardId } })
 
@@ -130,6 +138,10 @@ export async function getDeckFlashcards(deckId: string) {
       repetitions: true,
       nextReviewAt: true,
       createdAt: true,
+      frontAudioPath: true,
+      frontAudioName: true,
+      backAudioPath: true,
+      backAudioName: true,
     },
   })
 }
