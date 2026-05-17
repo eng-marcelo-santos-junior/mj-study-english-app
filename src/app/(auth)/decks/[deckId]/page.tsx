@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeckById, getDeckDueCount, deleteDeck } from '@/server/actions/deck-actions'
 import { getDeckFlashcards } from '@/server/actions/flashcard-actions'
+import { getReviewedTodayCount } from '@/server/actions/review-actions'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { Button } from '@/components/ui/button'
 import { FlashcardCard } from '@/components/cards/flashcard-card'
@@ -19,10 +20,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function DeckDetailPage({ params }: Props) {
   const { deckId } = await params
-  const [deck, dueCount, flashcards] = await Promise.all([
+  const [deck, dueCount, flashcards, reviewedToday] = await Promise.all([
     getDeckById(deckId),
     getDeckDueCount(deckId),
     getDeckFlashcards(deckId),
+    getReviewedTodayCount(deckId),
   ])
 
   if (!deck) notFound()
@@ -85,7 +87,7 @@ export default async function DeckDetailPage({ params }: Props) {
             value: dueCount,
             color: dueCount > 0 ? 'text-amber-600' : 'text-gray-900',
           },
-          { label: 'Revisados hoje', value: 0, color: 'text-green-600' },
+          { label: 'Revisados hoje', value: reviewedToday, color: 'text-green-600' },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -99,27 +101,44 @@ export default async function DeckDetailPage({ params }: Props) {
 
       {/* Actions */}
       <div className="flex items-center gap-3">
-        <Button disabled={cardCount === 0 || dueCount === 0} className="gap-2">
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          {dueCount > 0 ? `Revisar (${dueCount})` : 'Nada para revisar'}
-        </Button>
+        {dueCount > 0 ? (
+          <Link href={`/decks/${deck.id}/review`}>
+            <Button className="gap-2">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Revisar ({dueCount})
+            </Button>
+          </Link>
+        ) : (
+          <Button disabled className="gap-2">
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            Tudo em dia
+          </Button>
+        )}
 
         <Link href={`/decks/${deck.id}/cards/new`}>
           <Button variant="ghost">+ Adicionar card</Button>
