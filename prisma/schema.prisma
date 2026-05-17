@@ -1,0 +1,78 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  decks      Deck[]
+  reviewLogs ReviewLog[]
+
+  @@map("users")
+}
+
+model Deck {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flashcards Flashcard[]
+
+  @@index([userId])
+  @@map("decks")
+}
+
+model Flashcard {
+  id           String   @id @default(cuid())
+  deckId       String   @map("deck_id")
+  front        String
+  back         String
+  difficulty   String   @default("normal")
+  intervalDays Float    @default(1) @map("interval_days")
+  easeFactor   Float    @default(2.5) @map("ease_factor")
+  repetitions  Int      @default(0)
+  nextReviewAt DateTime @default(now()) @map("next_review_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  deck       Deck        @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  reviewLogs ReviewLog[]
+
+  @@index([deckId])
+  @@index([nextReviewAt])
+  @@map("flashcards")
+}
+
+model ReviewLog {
+  id                   String   @id @default(cuid())
+  flashcardId          String   @map("flashcard_id")
+  userId               String   @map("user_id")
+  rating               String
+  reviewedAt           DateTime @default(now()) @map("reviewed_at")
+  previousIntervalDays Float    @map("previous_interval_days")
+  newIntervalDays      Float    @map("new_interval_days")
+  previousEaseFactor   Float    @map("previous_ease_factor")
+  newEaseFactor        Float    @map("new_ease_factor")
+
+  flashcard Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([flashcardId])
+  @@index([userId])
+  @@index([reviewedAt])
+  @@map("review_logs")
+}
