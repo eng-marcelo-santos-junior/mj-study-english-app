@@ -54,6 +54,31 @@ export async function createFlashcard(deckId: string, data: FlashcardInput): Pro
   redirect(`/decks/${deckId}`)
 }
 
+// Returns the new card ID so the client can upload audio before redirecting
+export async function createFlashcardGetId(
+  deckId: string,
+  data: FlashcardInput
+): Promise<{ id: string } | { error: string }> {
+  const userId = await requireAuth()
+
+  const deck = await verifyDeckOwnership(deckId, userId)
+  if (!deck) return { error: 'Deck não encontrado.' }
+
+  const parsed = flashcardSchema.safeParse(data)
+  if (!parsed.success) return { error: 'Dados inválidos. Verifique os campos.' }
+
+  const card = await prisma.flashcard.create({
+    data: {
+      deckId,
+      frontContent: sanitizeHtml(parsed.data.frontContent),
+      backContent: sanitizeHtml(parsed.data.backContent),
+    },
+  })
+
+  revalidatePath(`/decks/${deckId}`)
+  return { id: card.id }
+}
+
 export async function createFlashcardAndContinue(
   deckId: string,
   data: FlashcardInput

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeckById } from '@/server/actions/deck-actions'
-import { createFlashcard, createFlashcardAndContinue } from '@/server/actions/flashcard-actions'
+import { createFlashcardGetId } from '@/server/actions/flashcard-actions'
 import { FlashcardForm } from '@/components/forms/flashcard-form'
 
 interface Props {
@@ -21,8 +21,7 @@ export default async function NewFlashcardPage({ params }: Props) {
 
   if (!deck) notFound()
 
-  const createAction = createFlashcard.bind(null, deckId)
-  const createAndContinueAction = createFlashcardAndContinue.bind(null, deckId)
+  const createAction = createFlashcardGetId.bind(null, deckId)
 
   return (
     <div className="flex flex-col gap-6">
@@ -53,8 +52,8 @@ export default async function NewFlashcardPage({ params }: Props) {
           action={createAction}
           submitLabel="Salvar e voltar"
           showAddAnother
-          onAddAnother={createAndContinueAction}
-          onCancel={undefined}
+          onAddAnother={createAction}
+          redirectAfterCreate={`/decks/${deckId}`}
         />
       </div>
 

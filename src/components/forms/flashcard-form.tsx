@@ -1,27 +1,32 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { flashcardSchema, type FlashcardInput } from '@/lib/validations'
 import { Button } from '@/components/ui/button'
 import { RichTextEditor } from '@/components/editor/RichTextEditor'
-import { AudioUploadField } from '@/components/audio/AudioUploadField'
+import { AudioUploadField, uploadAudioFile } from '@/components/audio/AudioUploadField'
+
+type ActionResult = { error: string } | { id: string } | undefined
 
 interface FlashcardFormProps {
   defaultValues?: FlashcardInput
-  action: (data: FlashcardInput) => Promise<{ error: string } | undefined>
+  action: (data: FlashcardInput) => Promise<ActionResult>
   onSuccess?: () => void
   onCancel?: () => void
   submitLabel?: string
   showAddAnother?: boolean
-  onAddAnother?: (data: FlashcardInput) => Promise<{ error: string } | undefined>
-  // Audio props (only available in edit mode)
+  onAddAnother?: (data: FlashcardInput) => Promise<ActionResult>
+  // Existing card (edit mode)
   flashcardId?: string
   frontAudioUrl?: string | null
   frontAudioName?: string | null
   backAudioUrl?: string | null
   backAudioName?: string | null
+  // New card (creation mode): redirect here after creation + audio upload
+  redirectAfterCreate?: string
 }
 
 export function FlashcardForm({
@@ -37,32 +42,76 @@ export function FlashcardForm({
   frontAudioName,
   backAudioUrl,
   backAudioName,
+  redirectAfterCreate,
 }: FlashcardFormProps) {
+  const router = useRouter()
+
   const [serverError, setServerError] = useState<string>()
   const [successMessage, setSuccessMessage] = useState<string>()
+  const [uploadingAudio, setUploadingAudio] = useState(false)
+
+  // Existing card audio state
   const [currentFrontAudioUrl, setCurrentFrontAudioUrl] = useState(frontAudioUrl)
   const [currentFrontAudioName, setCurrentFrontAudioName] = useState(frontAudioName)
   const [currentBackAudioUrl, setCurrentBackAudioUrl] = useState(backAudioUrl)
   const [currentBackAudioName, setCurrentBackAudioName] = useState(backAudioName)
 
+  // Pending audio files (new card creation)
+  const [pendingFrontAudio, setPendingFrontAudio] = useState<File | null>(null)
+  const [pendingBackAudio, setPendingBackAudio] = useState<File | null>(null)
+
   const {
     control,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { isSubmitting },
   } = useForm<FlashcardInput>({
     resolver: zodResolver(flashcardSchema),
     defaultValues: defaultValues ?? { frontContent: '', backContent: '' },
   })
 
+  const isCreationMode = !flashcardId
+  const busy = isSubmitting || uploadingAudio
+
+  async function uploadPendingAudio(cardId: string) {
+    const uploads: Promise<void>[] = []
+    if (pendingFrontAudio) uploads.push(uploadAudioFile(pendingFrontAudio, cardId, 'front'))
+    if (pendingBackAudio) uploads.push(uploadAudioFile(pendingBackAudio, cardId, 'back'))
+    if (uploads.length > 0) await Promise.all(uploads)
+  }
+
   const onSubmit = async (data: FlashcardInput) => {
     setServerError(undefined)
     setSuccessMessage(undefined)
+
     const result = await action(data)
-    if (result?.error) {
+
+    if (result && 'error' in result) {
       setServerError(result.error)
       return
     }
+
+    // New card created — upload pending audio then redirect
+    if (result && 'id' in result) {
+      if (pendingFrontAudio || pendingBackAudio) {
+        setUploadingAudio(true)
+        try {
+          await uploadPendingAudio(result.id)
+        } catch {
+          // Audio upload failed — card still saved, don't block
+        } finally {
+          setUploadingAudio(false)
+        }
+      }
+      if (redirectAfterCreate) {
+        router.push(redirectAfterCreate)
+      } else {
+        onSuccess?.()
+      }
+      return
+    }
+
+    // Edit mode: no return value
     onSuccess?.()
   }
 
@@ -70,12 +119,31 @@ export function FlashcardForm({
     if (!onAddAnother) return
     setServerError(undefined)
     setSuccessMessage(undefined)
+
     const result = await onAddAnother(data)
-    if (result?.error) {
+
+    if (result && 'error' in result) {
       setServerError(result.error)
       return
     }
+
+    // New card created — upload pending audio then reset
+    if (result && 'id' in result) {
+      if (pendingFrontAudio || pendingBackAudio) {
+        setUploadingAudio(true)
+        try {
+          await uploadPendingAudio(result.id)
+        } catch {
+          // ignore
+        } finally {
+          setUploadingAudio(false)
+        }
+      }
+    }
+
     reset({ frontContent: '', backContent: '' })
+    setPendingFrontAudio(null)
+    setPendingBackAudio(null)
     setSuccessMessage('Card adicionado!')
     setTimeout(() => setSuccessMessage(undefined), 2000)
   }
@@ -108,23 +176,20 @@ export function FlashcardForm({
         )}
       />
 
-      {flashcardId ? (
+      {isCreationMode ? (
+        <AudioUploadField side="front" onFileSelected={setPendingFrontAudio} disabled={busy} />
+      ) : (
         <AudioUploadField
           side="front"
           flashcardId={flashcardId}
           existingAudioUrl={currentFrontAudioUrl}
           existingAudioName={currentFrontAudioName}
-          onUploadComplete={(_, name) => {
-            setCurrentFrontAudioName(name)
-            // URL refreshed on next page load via signed URL
-          }}
+          onUploadComplete={(_, name) => setCurrentFrontAudioName(name)}
           onDeleteComplete={() => {
             setCurrentFrontAudioUrl(null)
             setCurrentFrontAudioName(null)
           }}
         />
-      ) : (
-        <p className="text-xs text-gray-400">Salve o card para adicionar áudio à frente.</p>
       )}
 
       <Controller
@@ -141,27 +206,25 @@ export function FlashcardForm({
         )}
       />
 
-      {flashcardId ? (
+      {isCreationMode ? (
+        <AudioUploadField side="back" onFileSelected={setPendingBackAudio} disabled={busy} />
+      ) : (
         <AudioUploadField
           side="back"
           flashcardId={flashcardId}
           existingAudioUrl={currentBackAudioUrl}
           existingAudioName={currentBackAudioName}
-          onUploadComplete={(_, name) => {
-            setCurrentBackAudioName(name)
-          }}
+          onUploadComplete={(_, name) => setCurrentBackAudioName(name)}
           onDeleteComplete={() => {
             setCurrentBackAudioUrl(null)
             setCurrentBackAudioName(null)
           }}
         />
-      ) : (
-        <p className="text-xs text-gray-400">Salve o card para adicionar áudio ao verso.</p>
       )}
 
       <div className="flex items-center justify-end gap-3 pt-2">
         {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
+          <Button type="button" variant="ghost" onClick={onCancel} disabled={busy}>
             Cancelar
           </Button>
         )}
@@ -170,15 +233,15 @@ export function FlashcardForm({
           <Button
             type="button"
             variant="ghost"
-            loading={isSubmitting}
+            loading={busy}
             onClick={handleSubmit(onSubmitAndContinue)}
           >
             Salvar e adicionar outro
           </Button>
         )}
 
-        <Button type="button" loading={isSubmitting} onClick={handleSubmit(onSubmit)}>
-          {submitLabel}
+        <Button type="button" loading={busy} onClick={handleSubmit(onSubmit)}>
+          {uploadingAudio ? 'Enviando áudio...' : submitLabel}
         </Button>
       </div>
     </form>

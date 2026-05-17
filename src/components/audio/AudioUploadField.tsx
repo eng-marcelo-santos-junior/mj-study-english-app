@@ -12,7 +12,42 @@ interface AudioUploadFieldProps {
   existingAudioName?: string | null
   onUploadComplete?: (storagePath: string, fileName: string, fileSize: number) => void
   onDeleteComplete?: () => void
+  // Pending mode (no flashcardId): called when user selects or removes a file
+  onFileSelected?: (file: File | null) => void
   disabled?: boolean
+}
+
+export async function uploadAudioFile(file: File, flashcardId: string, side: 'front' | 'back') {
+  const urlRes = await fetch('/api/audio/upload-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      flashcardId,
+      side,
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+    }),
+  })
+  if (!urlRes.ok) {
+    const { error } = await urlRes.json().catch(() => ({ error: 'Erro desconhecido' }))
+    throw new Error(error ?? 'Falha ao obter URL de upload')
+  }
+  const { signedUrl, storagePath } = await urlRes.json()
+
+  const uploadRes = await fetch(signedUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  })
+  if (!uploadRes.ok) throw new Error('Falha no upload do arquivo')
+
+  const metaRes = await fetch(`/api/audio/${flashcardId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ side, storagePath, fileName: file.name, fileSize: file.size }),
+  })
+  if (!metaRes.ok) throw new Error('Falha ao salvar metadados')
 }
 
 export function AudioUploadField({
@@ -22,6 +57,7 @@ export function AudioUploadField({
   existingAudioName,
   onUploadComplete,
   onDeleteComplete,
+  onFileSelected,
   disabled = false,
 }: AudioUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -31,6 +67,7 @@ export function AudioUploadField({
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const isPendingMode = !flashcardId && !!onFileSelected
   const hasExisting = !!existingAudioUrl
   const previewUrl = localPreviewUrl ?? existingAudioUrl ?? null
   const previewName = localFile?.name ?? existingAudioName ?? null
@@ -44,62 +81,37 @@ export function AudioUploadField({
       return
     }
     setError(null)
+
+    // Revoke previous blob URL
+    if (localPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(localPreviewUrl)
+
+    const blobUrl = URL.createObjectURL(file)
     setLocalFile(file)
-    setLocalPreviewUrl(URL.createObjectURL(file))
+    setLocalPreviewUrl(blobUrl)
+
+    if (isPendingMode) {
+      onFileSelected(file)
+    }
+  }
+
+  function handleRemovePending() {
+    if (localPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(localPreviewUrl)
+    setLocalFile(null)
+    setLocalPreviewUrl(null)
+    setError(null)
+    if (inputRef.current) inputRef.current.value = ''
+    onFileSelected?.(null)
   }
 
   async function handleUpload() {
     if (!localFile || !flashcardId) return
     setUploading(true)
     setError(null)
-
     try {
-      // Step 1: get signed upload URL
-      const urlRes = await fetch('/api/audio/upload-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          flashcardId,
-          side,
-          fileName: localFile.name,
-          fileSize: localFile.size,
-          mimeType: localFile.type,
-        }),
-      })
-
-      if (!urlRes.ok) {
-        const { error: msg } = await urlRes.json()
-        throw new Error(msg ?? 'Falha ao obter URL de upload')
-      }
-
-      const { signedUrl, storagePath } = await urlRes.json()
-
-      // Step 2: upload directly to Supabase Storage
-      const uploadRes = await fetch(signedUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': localFile.type },
-        body: localFile,
-      })
-
-      if (!uploadRes.ok) throw new Error('Falha no upload do arquivo')
-
-      // Step 3: save metadata
-      const metaRes = await fetch(`/api/audio/${flashcardId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          side,
-          storagePath,
-          fileName: localFile.name,
-          fileSize: localFile.size,
-        }),
-      })
-
-      if (!metaRes.ok) throw new Error('Falha ao salvar metadados')
-
+      await uploadAudioFile(localFile, flashcardId, side)
       setLocalFile(null)
       setLocalPreviewUrl(null)
-      onUploadComplete?.(storagePath, localFile.name, localFile.size)
+      onUploadComplete?.('', localFile.name, localFile.size)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally {
@@ -110,9 +122,7 @@ export function AudioUploadField({
 
   async function handleDelete() {
     if (!flashcardId) {
-      // Just clear local state
-      setLocalFile(null)
-      setLocalPreviewUrl(null)
+      handleRemovePending()
       return
     }
     setDeleting(true)
@@ -141,6 +151,11 @@ export function AudioUploadField({
       <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">
         <Mic className="h-4 w-4" />
         Áudio — {sideLabel}
+        {isPendingMode && localFile && (
+          <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">
+            será enviado ao salvar
+          </span>
+        )}
       </label>
 
       {previewUrl && (
@@ -172,6 +187,7 @@ export function AudioUploadField({
           </>
         )}
 
+        {/* Existing card: confirm upload button for newly selected file */}
         {localFile && !hasExisting && flashcardId && (
           <button
             type="button"
@@ -183,10 +199,11 @@ export function AudioUploadField({
           </button>
         )}
 
+        {/* Remove button */}
         {previewUrl && (
           <button
             type="button"
-            onClick={handleDelete}
+            onClick={isPendingMode ? handleRemovePending : handleDelete}
             disabled={disabled || deleting}
             className="flex items-center gap-1.5 rounded border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-700 dark:text-red-400"
           >
