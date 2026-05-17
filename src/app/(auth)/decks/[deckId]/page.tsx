@@ -2,8 +2,10 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getDeckById, getDeckDueCount, deleteDeck } from '@/server/actions/deck-actions'
+import { getDeckFlashcards } from '@/server/actions/flashcard-actions'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { Button } from '@/components/ui/button'
+import { FlashcardCard } from '@/components/cards/flashcard-card'
 
 interface Props {
   params: Promise<{ deckId: string }>
@@ -17,7 +19,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function DeckDetailPage({ params }: Props) {
   const { deckId } = await params
-  const [deck, dueCount] = await Promise.all([getDeckById(deckId), getDeckDueCount(deckId)])
+  const [deck, dueCount, flashcards] = await Promise.all([
+    getDeckById(deckId),
+    getDeckDueCount(deckId),
+    getDeckFlashcards(deckId),
+  ])
 
   if (!deck) notFound()
 
@@ -115,15 +121,12 @@ export default async function DeckDetailPage({ params }: Props) {
           {dueCount > 0 ? `Revisar (${dueCount})` : 'Nada para revisar'}
         </Button>
 
-        <Button variant="ghost" disabled>
-          + Adicionar card
-          <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
-            em breve
-          </span>
-        </Button>
+        <Link href={`/decks/${deck.id}/cards/new`}>
+          <Button variant="ghost">+ Adicionar card</Button>
+        </Link>
       </div>
 
-      {/* Cards list placeholder */}
+      {/* Cards list */}
       {cardCount === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white py-16">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
@@ -143,10 +146,27 @@ export default async function DeckDetailPage({ params }: Props) {
           </div>
           <h3 className="mt-3 text-sm font-medium text-gray-900">Nenhum flashcard</h3>
           <p className="mt-1 text-sm text-gray-500">Adicione cards para começar a estudar</p>
+          <Link href={`/decks/${deck.id}/cards/new`} className="mt-4">
+            <Button size="sm">+ Adicionar primeiro card</Button>
+          </Link>
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Lista de flashcards disponível na próxima sprint.</p>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-gray-700">
+              {cardCount} {cardCount === 1 ? 'card' : 'cards'}
+            </h2>
+            <Link href={`/decks/${deck.id}/cards/new`}>
+              <Button size="sm" variant="ghost">
+                + Adicionar card
+              </Button>
+            </Link>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {flashcards.map((card) => (
+              <FlashcardCard key={card.id} card={card} />
+            ))}
+          </div>
         </div>
       )}
     </div>
