@@ -22,7 +22,7 @@ export default async function DeckDetailPage({ params }: Props) {
   if (!deck) notFound()
 
   const cardCount = deck._count.flashcards
-  const handleDelete = () => deleteDeck(deck.id)
+  const handleDelete = deleteDeck.bind(null, deck.id)
 
   return (
     <div className="flex flex-col gap-6">
