@@ -165,6 +165,7 @@ export function AudioPlayer({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={restart}
             className="rounded p-1.5 text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700"
             title="Reiniciar (R)"
@@ -172,6 +173,7 @@ export function AudioPlayer({
             <RotateCcw className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={togglePlay}
             className="rounded-full bg-blue-500 p-1.5 text-white hover:bg-blue-600"
             title={isPlaying ? 'Pausar (Espaço)' : 'Reproduzir (Espaço)'}
@@ -179,6 +181,7 @@ export function AudioPlayer({
             {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </button>
           <button
+            type="button"
             onClick={toggleMute}
             className="rounded p-1.5 text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700"
             title="Mudo (M)"
@@ -192,6 +195,7 @@ export function AudioPlayer({
             {fmt(progress)} / {duration ? fmt(duration) : '--:--'}
           </span>
           <button
+            type="button"
             onClick={cycleSpeed}
             className="rounded bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300"
             title="Velocidade (↑↓)"
