@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { fetchVoices } from '@/lib/tts/edge-tts-client'
+
+const TTS_SERVER_URL = process.env.TTS_SERVER_URL
 
 export async function GET(request: NextRequest) {
   const session = await auth()
@@ -8,22 +9,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const locale = request.nextUrl.searchParams.get('locale')
+  if (!TTS_SERVER_URL) {
+    return NextResponse.json([])
+  }
+
+  const locale = request.nextUrl.searchParams.get('locale') ?? ''
 
   try {
-    const voices = await fetchVoices()
-    const filtered = locale ? voices.filter((v) => v.Locale.startsWith(locale)) : voices
-    const result = filtered.map((v) => ({
-      shortName: v.ShortName,
-      friendlyName: v.FriendlyName,
-      gender: v.Gender,
-      locale: v.Locale,
-    }))
-    return NextResponse.json(result, {
-      headers: { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' },
-    })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to fetch voices'
-    return NextResponse.json({ error: message }, { status: 502 })
+    const url = new URL(`${TTS_SERVER_URL}/voices`)
+    if (locale) url.searchParams.set('locale', locale)
+
+    const res = await fetch(url.toString(), { next: { revalidate: 3600 } })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+    const voices = (await res.json()) as Record<string, string>[]
+    return NextResponse.json(
+      voices.map((v) => ({
+        shortName: v.ShortName,
+        friendlyName: v.FriendlyName,
+        gender: v.Gender,
+        locale: v.Locale,
+      }))
+    )
+  } catch {
+    return NextResponse.json([])
   }
 }

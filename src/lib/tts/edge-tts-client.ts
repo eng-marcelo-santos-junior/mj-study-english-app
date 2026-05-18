@@ -1,153 +1,71 @@
-import WS from 'ws'
-import { randomUUID, createHash } from 'crypto'
+// TTS synthesis via Google Translate TTS (HTTP GET, no WebSocket, no API key needed).
+// Voice selection is not supported — one voice per language.
+// Replaces the original Edge TTS WebSocket approach which is blocked from Vercel IPs.
 
-const TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4'
-const CHROMIUM_VERSION = '130.0.2849.68'
-const SEC_MS_GEC_VERSION = `1-${CHROMIUM_VERSION}`
-const USER_AGENT = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROMIUM_VERSION} Safari/537.36 Edg/${CHROMIUM_VERSION}`
+const USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
 
-const VOICES_URL = `https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=${TOKEN}`
-const WSS_BASE = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${TOKEN}`
-
-// Microsoft added a challenge-response token in v6+ of the Edge TTS protocol.
-// Sec-MS-GEC = SHA256(Windows_FILETIME_rounded_to_3s_bucket + TOKEN).toUpperCase()
-// Uses BigInt() constructor (not literals) for ES2017 compatibility.
-function getSecMsGec(): string {
-  const epoch = BigInt(10000) * BigInt(Date.now()) + BigInt('116444736000000000')
-  const bucket = BigInt(3000000000)
-  const rounded = epoch - (epoch % bucket)
-  return createHash('sha256').update(`${rounded}${TOKEN}`).digest('hex').toUpperCase()
-}
-
-function getWsHeaders(): Record<string, string> {
-  return {
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Cache-Control': 'no-cache',
-    Origin: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
-    Pragma: 'no-cache',
-    'Sec-MS-GEC': getSecMsGec(),
-    'Sec-MS-GEC-Version': SEC_MS_GEC_VERSION,
-    'User-Agent': USER_AGENT,
-  }
-}
-
-const VOICES_HEADERS = {
-  'Accept-Encoding': 'gzip, deflate, br',
-  'User-Agent': USER_AGENT,
+// Google Translate language codes differ from BCP-47 locale codes in some cases.
+const LANG_MAP: Record<string, string> = {
+  'en-US': 'en',
+  'en-GB': 'en',
+  'pt-BR': 'pt',
+  'es-ES': 'es',
+  'es-MX': 'es',
+  'fr-FR': 'fr',
+  'de-DE': 'de',
+  'it-IT': 'it',
+  'ja-JP': 'ja',
+  'zh-CN': 'zh-CN',
 }
 
 export interface EdgeVoice {
-  Name: string
   ShortName: string
-  Gender: 'Male' | 'Female'
   Locale: string
-  SuggestedCodec: string
   FriendlyName: string
-  Status: string
 }
 
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
+export function getLanguages(): { code: string; label: string }[] {
+  return [
+    { code: 'en-US', label: 'English (United States)' },
+    { code: 'en-GB', label: 'English (United Kingdom)' },
+    { code: 'pt-BR', label: 'Portuguese (Brazil)' },
+    { code: 'es-ES', label: 'Spanish (Spain)' },
+    { code: 'es-MX', label: 'Spanish (Mexico)' },
+    { code: 'fr-FR', label: 'French (France)' },
+    { code: 'de-DE', label: 'German (Germany)' },
+    { code: 'it-IT', label: 'Italian (Italy)' },
+    { code: 'ja-JP', label: 'Japanese (Japan)' },
+    { code: 'zh-CN', label: 'Chinese (Simplified)' },
+  ]
 }
 
-function buildSpeechConfig(): string {
-  const body = JSON.stringify({
-    context: {
-      synthesis: {
-        audio: {
-          metadataoptions: { sentenceBoundaryEnabled: false, wordBoundaryEnabled: false },
-          outputFormat: 'audio-24khz-96kbitrate-mono-mp3',
-        },
-      },
+export async function synthesize(text: string, language: string): Promise<Buffer> {
+  if (!text.trim()) throw new Error('Text cannot be empty')
+  if (!language.trim()) throw new Error('Language must be specified')
+
+  const lang = LANG_MAP[language] ?? language.split('-')[0]
+
+  const url = new URL('https://translate.google.com/translate_tts')
+  url.searchParams.set('ie', 'UTF-8')
+  url.searchParams.set('q', text)
+  url.searchParams.set('tl', lang)
+  url.searchParams.set('client', 'tw-ob')
+  url.searchParams.set('ttsspeed', '1')
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      'User-Agent': USER_AGENT,
+      Referer: 'https://translate.google.com/',
+      Accept: 'audio/mpeg, audio/*',
     },
   })
-  return [
-    `X-Timestamp:${new Date().toISOString()}`,
-    'Content-Type:application/json; charset=utf-8',
-    'Path:speech.config',
-    '',
-    body,
-  ].join('\r\n')
-}
 
-function buildSSML(text: string, voice: string): string {
-  const requestId = randomUUID().replace(/-/g, '')
-  const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'><voice name='${voice}'><prosody rate='+0%' pitch='+0Hz'>${escapeXml(text)}</prosody></voice></speak>`
-  return [
-    `X-RequestId:${requestId}`,
-    'Content-Type:application/ssml+xml',
-    `X-Timestamp:${new Date().toISOString()}`,
-    'Path:ssml',
-    '',
-    ssml,
-  ].join('\r\n')
-}
+  if (!res.ok) {
+    throw new Error(`TTS request failed: HTTP ${res.status}`)
+  }
 
-export async function synthesize(text: string, voice: string): Promise<Buffer> {
-  if (!text.trim()) throw new Error('Text cannot be empty')
-  if (!voice.trim()) throw new Error('Voice must be specified')
-
-  return new Promise((resolve, reject) => {
-    const connectionId = randomUUID().replace(/-/g, '')
-    const ws = new WS(`${WSS_BASE}&ConnectionId=${connectionId}`, {
-      headers: getWsHeaders(),
-    })
-
-    const chunks: Buffer[] = []
-    let done = false
-
-    const finish = (result: Buffer | Error) => {
-      if (done) return
-      done = true
-      clearTimeout(timer)
-      ws.terminate()
-      if (result instanceof Error) reject(result)
-      else resolve(result)
-    }
-
-    const timer = setTimeout(
-      () => finish(new Error('TTS synthesis timed out after 30 seconds')),
-      30_000
-    )
-
-    ws.on('open', () => {
-      ws.send(buildSpeechConfig())
-      ws.send(buildSSML(text, voice))
-    })
-
-    ws.on('message', (data: WS.RawData, isBinary: boolean) => {
-      if (isBinary) {
-        const buf = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer)
-        const headerLen = buf.readUInt16BE(0)
-        const header = buf.subarray(2, 2 + headerLen).toString('utf8')
-        const audio = buf.subarray(2 + headerLen)
-        if (header.includes('Path:audio') && audio.length > 0) {
-          chunks.push(audio)
-        }
-      } else {
-        const msg = data.toString()
-        if (msg.includes('Path:turn.end')) {
-          if (chunks.length === 0) {
-            finish(new Error('TTS service returned no audio data'))
-          } else {
-            finish(Buffer.concat(chunks))
-          }
-        }
-      }
-    })
-
-    ws.on('error', finish)
-  })
-}
-
-export async function fetchVoices(): Promise<EdgeVoice[]> {
-  const res = await fetch(VOICES_URL, { headers: VOICES_HEADERS })
-  if (!res.ok) throw new Error(`Failed to fetch voice list: HTTP ${res.status}`)
-  return res.json() as Promise<EdgeVoice[]>
+  const arrayBuffer = await res.arrayBuffer()
+  if (arrayBuffer.byteLength === 0) throw new Error('TTS service returned empty audio')
+  return Buffer.from(arrayBuffer)
 }

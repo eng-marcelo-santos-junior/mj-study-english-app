@@ -9,9 +9,11 @@ import { z } from 'zod'
 
 const schema = z.object({
   side: z.enum(['front', 'back']),
-  voice: z.string().min(1),
   language: z.string().min(1),
+  voice: z.string().optional(),
 })
+
+const TTS_SERVER_URL = process.env.TTS_SERVER_URL
 
 type Params = { params: Promise<{ flashcardId: string }> }
 
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
   }
 
-  const { side, voice, language } = parsed.data
+  const { side, language, voice } = parsed.data
   const userId = session.user.id
 
   const flashcard = await prisma.flashcard.findFirst({
@@ -50,16 +52,32 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   try {
-    const audioBuffer = await synthesize(text, voice)
+    let audioBuffer: Buffer
+    let provider: string
+
+    if (TTS_SERVER_URL && voice) {
+      const res = await fetch(`${TTS_SERVER_URL}/synthesize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }))
+        throw new Error((err as { detail?: string }).detail ?? `HTTP ${res.status}`)
+      }
+      audioBuffer = Buffer.from(await res.arrayBuffer())
+      provider = 'edge_tts'
+    } else {
+      audioBuffer = await synthesize(text, language)
+      provider = 'google_tts'
+    }
+
     const textHash = calculateTextHash(text)
     const storagePath = `${userId}/${flashcardId}/${side}.mp3`
 
     const { error: uploadError } = await getSupabaseAdmin()
       .storage.from(AUDIO_BUCKET)
-      .upload(storagePath, audioBuffer, {
-        contentType: 'audio/mpeg',
-        upsert: true,
-      })
+      .upload(storagePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
     if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`)
 
     const { data: urlData } = await getSupabaseAdmin()
@@ -76,9 +94,9 @@ export async function POST(request: NextRequest, { params }: Params) {
             frontAudioSize: audioBuffer.length,
             frontAudioName: 'tts_generated.mp3',
             frontAudioSource: 'generated',
-            frontAudioProvider: 'edge_tts',
+            frontAudioProvider: provider,
             frontAudioLanguage: language,
-            frontAudioVoice: voice,
+            frontAudioVoice: voice ?? null,
             frontAudioTextHash: textHash,
             frontAudioGeneratedAt: now,
             audioUpdatedAt: now,
@@ -89,9 +107,9 @@ export async function POST(request: NextRequest, { params }: Params) {
             backAudioSize: audioBuffer.length,
             backAudioName: 'tts_generated.mp3',
             backAudioSource: 'generated',
-            backAudioProvider: 'edge_tts',
+            backAudioProvider: provider,
             backAudioLanguage: language,
-            backAudioVoice: voice,
+            backAudioVoice: voice ?? null,
             backAudioTextHash: textHash,
             backAudioGeneratedAt: now,
             audioUpdatedAt: now,

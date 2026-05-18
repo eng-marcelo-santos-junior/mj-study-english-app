@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { TTSOptionsPanel, TTS_STATE_DEFAULT, type TtsState } from '@/components/tts/TTSOptionsPanel'
 
-// Mock fetch globally
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
@@ -16,11 +15,8 @@ const MOCK_VOICES = [
   { shortName: 'en-US-GuyNeural', friendlyName: 'Guy (Neural)', gender: 'Male', locale: 'en-US' },
 ]
 
-function mockVoicesResponse() {
-  mockFetch.mockResolvedValue({
-    ok: true,
-    json: async () => MOCK_VOICES,
-  })
+function mockVoicesResponse(voices = MOCK_VOICES) {
+  mockFetch.mockResolvedValue({ ok: true, json: async () => voices })
 }
 
 function renderPanel(
@@ -64,13 +60,18 @@ describe('TTSOptionsPanel', () => {
     expect(screen.queryByText('Idioma')).not.toBeInTheDocument()
   })
 
-  it('shows language and voice selects when enabled', async () => {
+  it('shows language select when enabled', async () => {
     renderPanel({ enabled: true })
     expect(screen.getByText('Idioma')).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByText('Voz')).toBeInTheDocument())
   })
 
-  it('loads voices when enabled', async () => {
+  it('shows voice options after voices load', async () => {
+    renderPanel({ enabled: true, language: 'en-US' })
+    await waitFor(() => expect(screen.getByText(/Jenny/)).toBeInTheDocument())
+    expect(screen.getByText(/Guy/)).toBeInTheDocument()
+  })
+
+  it('fetches voices for the current locale when enabled', async () => {
     renderPanel({ enabled: true, language: 'en-US' })
     await waitFor(() =>
       expect(mockFetch).toHaveBeenCalledWith(
@@ -79,44 +80,66 @@ describe('TTSOptionsPanel', () => {
     )
   })
 
-  it('shows voice options after loading', async () => {
-    renderPanel({ enabled: true, language: 'en-US' })
-    await waitFor(() => expect(screen.getByText(/Jenny/)).toBeInTheDocument())
-    expect(screen.getByText(/Guy/)).toBeInTheDocument()
+  it('shows gender filter buttons when voices are available', async () => {
+    renderPanel({ enabled: true })
+    await waitFor(() => expect(screen.getByText('Feminino')).toBeInTheDocument())
+    expect(screen.getByText('Masculino')).toBeInTheDocument()
+    expect(screen.getByText('Todos')).toBeInTheDocument()
   })
 
-  it('shows "Gerar preview" button when enabled', () => {
+  it('shows "Gerar preview" button when enabled', async () => {
     renderPanel({ enabled: true })
     expect(screen.getByText('Gerar preview')).toBeInTheDocument()
   })
 
-  it('disables "Gerar preview" button when no voice is selected', () => {
+  it('disables "Gerar preview" when voices are loaded but none selected', async () => {
     renderPanel({ enabled: true, voice: '' })
+    await waitFor(() => screen.getByText(/Jenny/))
     expect(screen.getByText('Gerar preview')).toBeDisabled()
   })
 
-  it('calls preview API on generate button click', async () => {
+  it('enables "Gerar preview" when a voice is selected', async () => {
+    renderPanel({ enabled: true, voice: 'en-US-JennyNeural' })
+    await waitFor(() => screen.getByText(/Jenny/))
+    expect(screen.getByText('Gerar preview')).not.toBeDisabled()
+  })
+
+  it('enables "Gerar preview" without a voice when no voices are available (Google TTS fallback)', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => [] })
+    renderPanel({ enabled: true, voice: '' })
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled())
+    expect(screen.getByText('Gerar preview')).not.toBeDisabled()
+  })
+
+  it('calls preview API with voice and language on button click', async () => {
     const previewFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         audioDataUrl: 'data:audio/mp3;base64,abc',
-        textHash: 'hash123',
+        textHash: 'h1',
         text: 'Hello world',
       }),
     })
     mockFetch
-      .mockResolvedValueOnce({ ok: true, json: async () => MOCK_VOICES }) // voices
-      .mockImplementation(previewFetch) // preview
+      .mockResolvedValueOnce({ ok: true, json: async () => MOCK_VOICES })
+      .mockImplementation(previewFetch)
 
-    const { onChange } = renderPanel({ enabled: true, voice: 'en-US-JennyNeural' })
+    const { onChange } = renderPanel({
+      enabled: true,
+      language: 'en-US',
+      voice: 'en-US-JennyNeural',
+    })
 
-    await waitFor(() => screen.getByText('Gerar preview'))
+    await waitFor(() => screen.getByText(/Jenny/))
     fireEvent.click(screen.getByText('Gerar preview'))
 
     await waitFor(() =>
       expect(previewFetch).toHaveBeenCalledWith(
         '/api/tts/preview',
-        expect.objectContaining({ method: 'POST' })
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"voice":"en-US-JennyNeural"'),
+        })
       )
     )
     expect(onChange).toHaveBeenCalledWith(
@@ -130,7 +153,7 @@ describe('TTSOptionsPanel', () => {
       .mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Serviço indisponível' }) })
 
     renderPanel({ enabled: true, voice: 'en-US-JennyNeural' })
-    await waitFor(() => screen.getByText('Gerar preview'))
+    await waitFor(() => screen.getByText(/Jenny/))
     fireEvent.click(screen.getByText('Gerar preview'))
 
     await waitFor(() => expect(screen.getByText(/Serviço indisponível/)).toBeInTheDocument())
@@ -173,5 +196,22 @@ describe('TTSOptionsPanel', () => {
       <TTSOptionsPanel side="back" content="hello" state={TTS_STATE_DEFAULT} onChange={onChange} />
     )
     expect(screen.getByText(/Gerar áudio do verso/)).toBeInTheDocument()
+  })
+
+  it('clears voice and preview when language changes', async () => {
+    const { onChange } = renderPanel({
+      enabled: true,
+      language: 'en-US',
+      voice: 'en-US-JennyNeural',
+    })
+    await waitFor(() => screen.getByText(/Jenny/))
+
+    const selects = screen.getAllByRole('combobox')
+    const languageSelect = selects[0]
+    fireEvent.change(languageSelect, { target: { value: 'pt-BR' } })
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ language: 'pt-BR', voice: '', previewUrl: null })
+    )
   })
 })

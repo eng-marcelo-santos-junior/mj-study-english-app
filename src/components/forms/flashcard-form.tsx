@@ -37,11 +37,11 @@ async function callTtsGenerate(
   side: 'front' | 'back',
   tts: TtsState
 ): Promise<void> {
-  if (!tts.enabled || !tts.voice) return
+  if (!tts.enabled) return
   await fetch(`/api/tts/${flashcardId}/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ side, voice: tts.voice, language: tts.language }),
+    body: JSON.stringify({ side, language: tts.language, voice: tts.voice || undefined }),
   })
   // Errors here are non-fatal — card already saved
 }
@@ -108,7 +108,6 @@ export function FlashcardForm({
 
   function validateTts(tts: TtsState, sideLabel: string): string | null {
     if (!tts.enabled) return null
-    if (!tts.voice) return `Selecione uma voz para o áudio da ${sideLabel}.`
     if (tts.previewUrl === null) return `Gere o preview de áudio da ${sideLabel} antes de salvar.`
     return null
   }
@@ -124,8 +123,8 @@ export function FlashcardForm({
 
   async function generateTtsAudio(cardId: string) {
     const jobs: Promise<void>[] = []
-    if (frontTts.enabled && frontTts.voice) jobs.push(callTtsGenerate(cardId, 'front', frontTts))
-    if (backTts.enabled && backTts.voice) jobs.push(callTtsGenerate(cardId, 'back', backTts))
+    if (frontTts.enabled) jobs.push(callTtsGenerate(cardId, 'front', frontTts))
+    if (backTts.enabled) jobs.push(callTtsGenerate(cardId, 'back', backTts))
     if (jobs.length > 0) await Promise.all(jobs)
   }
 

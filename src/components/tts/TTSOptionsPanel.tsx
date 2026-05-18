@@ -59,11 +59,12 @@ export function TTSOptionsPanel({
   disabled = false,
   disabledReason,
 }: TTSOptionsPanelProps) {
-  // Track which locale voices were loaded for, so loading state is derived
-  // (avoids synchronous setState inside useEffect).
+  // Track which locale voices were loaded for — loading state is derived from this
+  // to avoid calling setState synchronously inside useEffect.
   const [voicesLocale, setVoicesLocale] = useState<string | null>(null)
   const [voices, setVoices] = useState<Voice[]>([])
   const [voicesError, setVoicesError] = useState<string | null>(null)
+  const [genderFilter, setGenderFilter] = useState<'' | 'Female' | 'Male'>('')
   const [previewError, setPreviewError] = useState<string | null>(null)
 
   const sideLabel = side === 'front' ? 'da frente' : 'do verso'
@@ -71,6 +72,9 @@ export function TTSOptionsPanel({
   const contentChanged =
     state.enabled && state.previewContent !== null && state.previewContent !== content
 
+  const filteredVoices = genderFilter ? voices.filter((v) => v.gender === genderFilter) : voices
+
+  // Load voices whenever TTS is enabled or language changes
   useEffect(() => {
     if (!state.enabled) return
     const locale = state.language
@@ -89,7 +93,11 @@ export function TTSOptionsPanel({
         }
       })
       .catch(() => {
-        if (active) setVoicesError('Não foi possível carregar as vozes. Verifique sua conexão.')
+        if (active) {
+          setVoices([])
+          setVoicesLocale(locale)
+          setVoicesError('Não foi possível carregar as vozes.')
+        }
       })
 
     return () => {
@@ -103,7 +111,14 @@ export function TTSOptionsPanel({
   }
 
   const handleLanguageChange = (language: string) => {
+    setGenderFilter('')
+    setVoicesLocale(null)
     onChange({ ...state, language, voice: '', previewUrl: null, previewContent: null })
+  }
+
+  const handleGenderChange = (gender: '' | 'Female' | 'Male') => {
+    setGenderFilter(gender)
+    onChange({ ...state, voice: '', previewUrl: null, previewContent: null })
   }
 
   const handleVoiceChange = (voice: string) => {
@@ -115,10 +130,6 @@ export function TTSOptionsPanel({
       setPreviewError('Digite um texto antes de gerar o áudio.')
       return
     }
-    if (!state.voice) {
-      setPreviewError('Selecione uma voz para continuar.')
-      return
-    }
 
     setPreviewError(null)
     onChange({ ...state, generating: true, previewUrl: null, previewContent: null })
@@ -127,7 +138,11 @@ export function TTSOptionsPanel({
       const res = await fetch('/api/tts/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, voice: state.voice }),
+        body: JSON.stringify({
+          content,
+          language: state.language,
+          voice: state.voice || undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -146,6 +161,9 @@ export function TTSOptionsPanel({
       onChange({ ...state, generating: false })
     }
   }
+
+  // Preview requires a voice when voices are available; no voice needed for Google TTS fallback
+  const previewDisabled = state.generating || (voices.length > 0 && !state.voice)
 
   return (
     <div className="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-gray-700">
@@ -187,29 +205,58 @@ export function TTSOptionsPanel({
             </select>
           </div>
 
-          {/* Voice */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Voz</label>
-            {voicesLoading ? (
-              <p className="text-xs text-gray-400">Carregando vozes...</p>
-            ) : voicesError ? (
-              <p className="text-xs text-red-500">{voicesError}</p>
-            ) : (
-              <select
-                value={state.voice}
-                onChange={(e) => handleVoiceChange(e.target.value)}
-                disabled={state.generating || voices.length === 0}
-                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-              >
-                <option value="">— Selecione uma voz —</option>
-                {voices.map((v) => (
-                  <option key={v.shortName} value={v.shortName}>
-                    {v.friendlyName} ({v.gender === 'Female' ? 'Feminina' : 'Masculina'})
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          {/* Voice selection — shown only when server is configured */}
+          {voicesLoading ? (
+            <p className="text-xs text-gray-400">Carregando vozes...</p>
+          ) : voicesError ? (
+            <p className="text-xs text-amber-600">
+              {voicesError} Usando síntese básica sem seleção de voz.
+            </p>
+          ) : voices.length > 0 ? (
+            <>
+              {/* Gender filter */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  Gênero
+                </label>
+                <div className="flex gap-2">
+                  {(['', 'Female', 'Male'] as const).map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => handleGenderChange(g)}
+                      disabled={state.generating}
+                      className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                        genderFilter === g
+                          ? 'bg-indigo-600 text-white'
+                          : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                      } disabled:opacity-50`}
+                    >
+                      {g === '' ? 'Todos' : g === 'Female' ? 'Feminino' : 'Masculino'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Voice select */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Voz</label>
+                <select
+                  value={state.voice}
+                  onChange={(e) => handleVoiceChange(e.target.value)}
+                  disabled={state.generating || filteredVoices.length === 0}
+                  className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                >
+                  <option value="">— Selecione uma voz —</option>
+                  {filteredVoices.map((v) => (
+                    <option key={v.shortName} value={v.shortName}>
+                      {v.friendlyName} ({v.gender === 'Female' ? 'Feminina' : 'Masculina'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : null}
 
           {/* Preview error */}
           {previewError && <p className="text-xs text-red-500">{previewError}</p>}
@@ -226,7 +273,7 @@ export function TTSOptionsPanel({
           <button
             type="button"
             onClick={handleGeneratePreview}
-            disabled={state.generating || !state.voice}
+            disabled={previewDisabled}
             className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Sparkles className="h-4 w-4" />
@@ -241,7 +288,7 @@ export function TTSOptionsPanel({
               </p>
               <AudioPlayer
                 src={state.previewUrl}
-                label={`Preview — ${state.voice}`}
+                label={`Preview — ${state.voice || state.language}`}
                 className="w-full"
               />
             </div>

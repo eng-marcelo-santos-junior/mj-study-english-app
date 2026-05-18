@@ -6,8 +6,11 @@ import { z } from 'zod'
 
 const schema = z.object({
   content: z.string().min(1, 'Content cannot be empty'),
-  voice: z.string().min(1, 'Voice must be specified'),
+  language: z.string().min(1, 'Language must be specified'),
+  voice: z.string().optional(),
 })
+
+const TTS_SERVER_URL = process.env.TTS_SERVER_URL
 
 export async function POST(request: NextRequest) {
   const session = await auth()
@@ -22,7 +25,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: messages[0] ?? 'Invalid input' }, { status: 400 })
   }
 
-  const { content, voice } = parsed.data
+  const { content, language, voice } = parsed.data
   const text = cleanHtmlText(content)
 
   if (!text) {
@@ -30,7 +33,25 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const audioBuffer = await synthesize(text, voice)
+    let audioBuffer: Buffer
+
+    if (TTS_SERVER_URL && voice) {
+      // Primary: Edge TTS via Python server
+      const res = await fetch(`${TTS_SERVER_URL}/synthesize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }))
+        throw new Error((err as { detail?: string }).detail ?? `HTTP ${res.status}`)
+      }
+      audioBuffer = Buffer.from(await res.arrayBuffer())
+    } else {
+      // Fallback: Google Translate TTS (no voice selection)
+      audioBuffer = await synthesize(text, language)
+    }
+
     const base64 = audioBuffer.toString('base64')
     const textHash = calculateTextHash(text)
     return NextResponse.json({
