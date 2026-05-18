@@ -11,6 +11,7 @@ const schema = z.object({
 })
 
 const TTS_SERVER_URL = process.env.TTS_SERVER_URL
+const TTS_INTERNAL_API_KEY = process.env.TTS_INTERNAL_API_KEY
 
 export async function POST(request: NextRequest) {
   const session = await auth()
@@ -36,10 +37,13 @@ export async function POST(request: NextRequest) {
     let audioBuffer: Buffer
 
     if (TTS_SERVER_URL && voice) {
-      // Primary: Edge TTS via Python server
+      // Primary: Edge TTS via Python server (/synthesize returns raw MP3 bytes)
       const res = await fetch(`${TTS_SERVER_URL}/synthesize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(TTS_INTERNAL_API_KEY ? { Authorization: `Bearer ${TTS_INTERNAL_API_KEY}` } : {}),
+        },
         body: JSON.stringify({ text, voice }),
       })
       if (!res.ok) {
