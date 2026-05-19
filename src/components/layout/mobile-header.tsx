@@ -10,6 +10,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/decks', label: 'Meus Decks' },
   { href: '/stats', label: 'Estatísticas' },
+  { href: '/practice', label: 'Prática Livre' },
 ]
 
 interface MobileHeaderProps {

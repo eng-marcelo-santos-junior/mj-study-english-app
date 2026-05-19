@@ -143,6 +143,27 @@ export default async function DeckDetailPage({ params }: Props) {
         <Link href={`/decks/${deck.id}/cards/new`}>
           <Button variant="ghost">+ Adicionar card</Button>
         </Link>
+
+        {cardCount > 0 && (
+          <Link href={`/decks/${deck.id}/practice`}>
+            <Button
+              variant="ghost"
+              className="gap-1.5 text-violet-600 hover:bg-violet-50 hover:text-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/40"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Praticar livremente
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Cards list */}
