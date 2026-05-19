@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { cleanHtmlText, calculateTextHash } from '@/lib/tts/text-utils'
+import { synthesize } from '@/lib/tts/edge-tts-client'
+import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { AUDIO_BUCKET } from '@/lib/audio/audio-validation'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
@@ -58,71 +61,92 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  if (!TTS_SERVER_URL) {
-    return NextResponse.json(
-      { error: 'TTS service is not configured on this server.' },
-      { status: 503 }
-    )
-  }
-
-  if (!voice) {
+  if (!voice && TTS_SERVER_URL) {
     return NextResponse.json({ error: 'Voice must be specified.' }, { status: 400 })
   }
 
   try {
-    const ttsRes = await fetch(`${TTS_SERVER_URL}/tts/generate`, {
-      method: 'POST',
-      headers: ttsHeaders(),
-      body: JSON.stringify({
-        card_id: flashcardId,
-        user_id: userId,
-        side,
-        text,
-        language,
-        voice,
-        rate,
-        pitch,
-      }),
-    })
+    let audioUrl: string
+    let storagePath: string
+    let audioSizeBytes: number
 
-    if (!ttsRes.ok) {
-      const err = await ttsRes.json().catch(() => ({ detail: `HTTP ${ttsRes.status}` }))
-      throw new Error((err as { detail?: string }).detail ?? `HTTP ${ttsRes.status}`)
+    if (TTS_SERVER_URL) {
+      // Primary: Python TTS service handles generation + Supabase upload
+      const ttsRes = await fetch(`${TTS_SERVER_URL}/tts/generate`, {
+        method: 'POST',
+        headers: ttsHeaders(),
+        body: JSON.stringify({
+          card_id: flashcardId,
+          user_id: userId,
+          side,
+          text,
+          language,
+          voice,
+          rate,
+          pitch,
+        }),
+      })
+
+      if (!ttsRes.ok) {
+        const err = await ttsRes.json().catch(() => ({ detail: `HTTP ${ttsRes.status}` }))
+        throw new Error((err as { detail?: string }).detail ?? `HTTP ${ttsRes.status}`)
+      }
+
+      const ttsData = (await ttsRes.json()) as {
+        audio_url: string
+        storage_path: string
+        audio_size_bytes?: number
+      }
+      audioUrl = ttsData.audio_url
+      storagePath = ttsData.storage_path
+      audioSizeBytes = ttsData.audio_size_bytes ?? 0
+    } else {
+      // Fallback: Google Translate TTS + direct Supabase upload from Next.js
+      const audioBuffer = await synthesize(text, language)
+      storagePath = `${userId}/${flashcardId}/${side}.mp3`
+      audioSizeBytes = audioBuffer.byteLength
+
+      const supabase = getSupabaseAdmin()
+      const { error: uploadError } = await supabase.storage
+        .from(AUDIO_BUCKET)
+        .upload(storagePath, audioBuffer, { contentType: 'audio/mpeg', upsert: true })
+      if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`)
+
+      const { data: signedData, error: signError } = await supabase.storage
+        .from(AUDIO_BUCKET)
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 365)
+      if (signError || !signedData) throw new Error(`Failed to create signed URL`)
+      audioUrl = signedData.signedUrl
     }
 
-    const ttsData = (await ttsRes.json()) as {
-      audio_url: string
-      storage_path: string
-      audio_size_bytes?: number
-    }
-
+    const provider = TTS_SERVER_URL ? 'edge_tts' : 'google_translate'
     const textHash = calculateTextHash(text)
     const now = new Date()
 
     const updateData =
       side === 'front'
         ? {
-            frontAudioUrl: ttsData.audio_url,
-            frontAudioPath: ttsData.storage_path,
-            frontAudioSize: ttsData.audio_size_bytes ?? null,
+            frontAudioUrl: audioUrl,
+            frontAudioPath: storagePath,
+            frontAudioSize: audioSizeBytes,
             frontAudioName: 'tts_generated.mp3',
             frontAudioSource: 'generated',
-            frontAudioProvider: 'edge_tts',
+            frontAudioProvider: provider,
             frontAudioLanguage: language,
-            frontAudioVoice: voice,
+            frontAudioVoice: voice ?? null,
             frontAudioTextHash: textHash,
             frontAudioGeneratedAt: now,
             audioUpdatedAt: now,
           }
         : {
-            backAudioUrl: ttsData.audio_url,
-            backAudioPath: ttsData.storage_path,
-            backAudioSize: ttsData.audio_size_bytes ?? null,
+            backAudioUrl: audioUrl,
+            backAudioPath: storagePath,
+            backAudioSize: audioSizeBytes,
             backAudioName: 'tts_generated.mp3',
             backAudioSource: 'generated',
-            backAudioProvider: 'edge_tts',
+            backAudioProvider: provider,
             backAudioLanguage: language,
-            backAudioVoice: voice,
+            backAudioVoice: voice ?? null,
             backAudioTextHash: textHash,
             backAudioGeneratedAt: now,
             audioUpdatedAt: now,
@@ -130,7 +154,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     await prisma.flashcard.update({ where: { id: flashcardId }, data: updateData })
 
-    return NextResponse.json({ ok: true, storagePath: ttsData.storage_path, textHash })
+    return NextResponse.json({ ok: true, storagePath, textHash })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Generation failed'
     return NextResponse.json(
