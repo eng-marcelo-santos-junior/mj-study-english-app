@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: mj-study-tts-service
+    runtime: docker
+    rootDir: services/tts-service
+    dockerfilePath: ./Dockerfile
+    region: oregon
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_AUDIO_BUCKET
+        value: flashcard-audios
+      - key: TTS_INTERNAL_API_KEY
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: MAX_TTS_TEXT_LENGTH
+        value: "5000"
