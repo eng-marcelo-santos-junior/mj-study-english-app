@@ -1,3 +1,12 @@
+---
+title: MJ Study TTS Service
+emoji: 🎙️
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # TTS Service
 
 Microserviço Python que gera áudio MP3 a partir de texto usando a biblioteca `edge-tts` (Microsoft Edge TTS) e salva os arquivos no Supabase Storage.
@@ -224,20 +233,6 @@ flashcard-audios/
         ├── front.mp3
         └── back.mp3
 ```
-
----
-
-## Deploy separado da Vercel
-
-Este serviço é deployado **separadamente** da aplicação web Next.js. Opções recomendadas:
-
-- **Render** — `render.yaml` com `startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- **Railway** — Dockerfile detectado automaticamente
-- **Fly.io** — `fly launch` na pasta do serviço
-- **Google Cloud Run** — `gcloud run deploy` com a imagem Docker
-- **AWS ECS** — task definition apontando para a imagem
-
-Após o deploy, configure `TTS_SERVER_URL` na aplicação web (Vercel) com a URL pública do serviço.
 
 ---
 
